@@ -1,0 +1,8 @@
+backend/.env
+*/.env
+.env
+.env.local
+.env.production
+.env.*.local
+*.dev.log
+**/.dev.log
