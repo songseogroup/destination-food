@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Search, User, Menu, X, MapPin, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react'
+import { Search, User, Menu, X, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 import { useCustomerAuth } from '../contexts/CustomerAuthContext'
 
@@ -36,9 +36,6 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/" className="text-white hover:text-primary-500 transition-colors">
-              Home
-            </Link>
             <Link href="/bars" className="text-white hover:text-primary-500 transition-colors">
               Bars
             </Link>
@@ -69,12 +66,6 @@ export default function Header() {
 
           {/* Right side actions */}
           <div className="flex items-center space-x-3">
-            {/* Location */}
-            <div className="hidden sm:flex items-center text-gray-400">
-              <MapPin className="h-5 w-5 mr-1" />
-              <span className="text-sm">New York</span>
-            </div>
-
             {/* Auth Buttons or User Dropdown */}
             {isAuthenticated && customer ? (
               /* Logged in - show user dropdown */
@@ -161,9 +152,6 @@ export default function Header() {
         {isMenuOpen && (
           <div className="md:hidden pb-4 border-t border-gray-800">
             <nav className="flex flex-col space-y-4 pt-4">
-              <Link href="/" className="text-white hover:text-primary-500 transition-colors" onClick={() => setIsMenuOpen(false)}>
-                Home
-              </Link>
               <Link href="/bars" className="text-white hover:text-primary-500 transition-colors" onClick={() => setIsMenuOpen(false)}>
                 Bars
               </Link>
