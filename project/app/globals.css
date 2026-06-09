@@ -7,10 +7,30 @@
   html {
     scroll-behavior: smooth;
   }
-  
+
   body {
     font-family: 'Inter', system-ui, sans-serif;
     @apply bg-black text-white;
+  }
+
+  /*
+   * Default form-control styling.
+   *
+   * The body sets color:white for the dark homepage theme, but unstyled
+   * inputs would inherit that and become invisible on light-themed cards
+   * (bg-white). Set sensible defaults here. Any page that wants a dark
+   * input can override via Tailwind utilities (e.g. bg-gray-800 text-white)
+   * — those win on specificity.
+   */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='submit']):not([type='button']),
+  textarea,
+  select {
+    @apply text-gray-900 bg-white;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    @apply text-gray-400;
   }
 }
 
