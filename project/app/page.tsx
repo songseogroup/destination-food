@@ -15,18 +15,12 @@ export default function HomePage() {
       <main>
         <Banner />
         <BannerSlot slot="top_hero" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
-            <div className="space-y-8">
-              <FeaturedBars />
-              <FeaturedDistilleries />
-              <BannerSlot slot="mid_inline" />
-              <FeaturedEvents />
-            </div>
-            <BannerSlot slot="right_rail" variant="vertical" className="hidden lg:flex" />
-          </div>
-        </div>
+        <FeaturedBars />
+        <BannerSlot slot="mid_inline" />
+        <FeaturedDistilleries />
         <BannerSlot slot="featured_above" />
+        <FeaturedEvents />
+        <BannerSlot slot="right_rail" />
         <FeaturedBlogs />
       </main>
       <Footer />

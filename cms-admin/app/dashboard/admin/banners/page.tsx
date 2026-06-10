@@ -33,13 +33,13 @@ interface Banner {
 }
 
 const SLOT_LABELS: Record<Slot, string> = {
-  top_hero: 'Top Hero (under header)',
-  right_rail: 'Right Rail (vertical sidebar)',
-  mid_inline: 'Mid Inline (between sections)',
-  featured_above: 'Above Featured Experiences',
+  top_hero: 'Below hero — between Banner and Featured Bars',
+  mid_inline: 'Between Featured Bars and Distilleries',
+  featured_above: 'Between Distilleries and Events',
+  right_rail: 'Between Events and Blogs',
 }
 
-const SLOT_ORDER: Slot[] = ['top_hero', 'right_rail', 'mid_inline', 'featured_above']
+const SLOT_ORDER: Slot[] = ['top_hero', 'mid_inline', 'featured_above', 'right_rail']
 
 export default function BannerAdminPage() {
   const user = auth.getUser()
