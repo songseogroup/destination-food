@@ -7,6 +7,7 @@ import { Customer } from './entities/customer.entity';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { LoginCustomerDto } from './dto/login-customer.dto';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class CustomersService {
@@ -14,6 +15,7 @@ export class CustomersService {
     @InjectRepository(Customer)
     private customerRepository: Repository<Customer>,
     private jwtService: JwtService,
+    private emailService: EmailService,
   ) {}
 
   async signup(createCustomerDto: CreateCustomerDto): Promise<{ customer: Customer; token: string }> {
@@ -35,6 +37,12 @@ export class CustomersService {
     });
 
     const savedCustomer = await this.customerRepository.save(customer);
+
+    // Fire-and-forget welcome email — never fail signup if SMTP is down.
+    const displayName = `${savedCustomer.firstName || ''} ${savedCustomer.lastName || ''}`.trim() || 'there';
+    this.emailService
+      .sendWelcomeEmail(savedCustomer.email, displayName, 'customer')
+      .catch(() => undefined);
 
     // Generate JWT token
     const token = this.generateToken(savedCustomer);

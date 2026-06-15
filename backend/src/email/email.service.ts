@@ -42,13 +42,14 @@ export class EmailService {
       return false;
     }
 
-    const from = this.configService.get<string>('SMTP_FROM') || 
-                 this.configService.get<string>('SMTP_USER') || 
-                 'noreply@byfoods.com';
+    const from = this.configService.get<string>('SMTP_FROM') ||
+                 this.configService.get<string>('SMTP_USER') ||
+                 'noreply@destinationwhisky.com';
+    const brand = this.configService.get<string>('BRAND_NAME') || 'Destination Whisky';
 
     try {
       const info = await this.transporter.sendMail({
-        from: `ByFoods <${from}>`,
+        from: `${brand} <${from}>`,
         to,
         subject,
         text: text || this.stripHtml(html),
@@ -159,6 +160,22 @@ export class EmailService {
   }
 
   /**
+   * Welcome email for a brand-new customer or business owner.
+   */
+  async sendWelcomeEmail(
+    to: string,
+    name: string,
+    audience: 'customer' | 'owner' = 'customer',
+  ): Promise<boolean> {
+    const subject =
+      audience === 'owner'
+        ? 'Welcome to Destination Whisky — your account is ready'
+        : 'Welcome to Destination Whisky';
+    const html = this.getWelcomeEmailTemplate(name, audience);
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
    * Send KYC incomplete reminder
    */
   async sendKYCIncompleteReminder(
@@ -175,6 +192,72 @@ export class EmailService {
   /**
    * Email templates
    */
+  private getWelcomeEmailTemplate(name: string, audience: 'customer' | 'owner'): string {
+    const ctaUrl =
+      audience === 'owner'
+        ? this.configService.get<string>('CMS_ADMIN_URL') || 'https://destinationwhisky.com'
+        : this.configService.get<string>('FRONTEND_URL') || 'https://destinationwhisky.com';
+    const ctaLabel = audience === 'owner' ? 'Go to your dashboard' : 'Start exploring';
+    const intro =
+      audience === 'owner'
+        ? 'Your business owner account is ready. Head to your dashboard to set up your listing, upload photos, and connect Stripe so you can start accepting bookings.'
+        : 'Your account is ready. Browse premium whisky bars, distillery tours, tastings, and exclusive events — all in one place.';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Welcome to Destination Whisky</title>
+      </head>
+      <body style="margin:0;padding:0;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;color:#f4f4f5;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:32px 16px;">
+          <tr><td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#111;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;">
+              <tr>
+                <td style="padding:40px 32px;text-align:center;background:linear-gradient(135deg,#0a0a0a 0%,#1a1a1a 100%);border-bottom:2px solid #eab308;">
+                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                    Destination <span style="color:#eab308;">Whisky</span>
+                  </h1>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:32px;">
+                  <p style="margin:0 0 12px;font-size:20px;color:#ffffff;">Welcome, ${name} 👋</p>
+                  <p style="margin:0 0 24px;font-size:15px;color:#a1a1aa;line-height:1.6;">${intro}</p>
+
+                  <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:24px auto;">
+                    <tr>
+                      <td style="background:#eab308;border-radius:8px;">
+                        <a href="${ctaUrl}" style="display:inline-block;padding:14px 32px;color:#000000;font-weight:600;font-size:15px;text-decoration:none;">
+                          ${ctaLabel}
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p style="margin:24px 0 0;font-size:13px;color:#71717a;line-height:1.6;">
+                    Trouble with the button? Paste this link into your browser:<br/>
+                    <a href="${ctaUrl}" style="color:#eab308;word-break:break-all;">${ctaUrl}</a>
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:24px 32px;background:#0a0a0a;border-top:1px solid #1f1f1f;text-align:center;">
+                  <p style="margin:0;font-size:12px;color:#52525b;">
+                    You're receiving this because you signed up at Destination Whisky.<br/>
+                    If this wasn't you, you can safely ignore this email.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+      </html>
+    `;
+  }
+
   private getBookingConfirmationTemplate(
     customerName: string,
     orderId: number,

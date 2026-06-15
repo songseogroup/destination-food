@@ -200,7 +200,13 @@ export class AuthService {
 
     const savedUser = await this.userRepository.save(user);
     await this.ensurePaymentAccountProvisioned(savedUser.id, savedUser.role);
-    
+
+    // Fire-and-forget welcome email for the new business owner.
+    const displayName = `${savedUser.firstName || ''} ${savedUser.lastName || ''}`.trim() || 'there';
+    this.emailService
+      .sendWelcomeEmail(savedUser.email, displayName, 'owner')
+      .catch((err) => this.logger.warn(`Welcome email failed for ${savedUser.email}: ${err.message}`));
+
     // Return user without password
     const { password, ...result } = savedUser;
     return result;
