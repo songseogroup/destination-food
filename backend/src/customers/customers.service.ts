@@ -1,22 +1,75 @@
-import { Injectable, NotFoundException, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ConflictException, UnauthorizedException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { createHash, randomBytes } from 'crypto';
 import { Customer } from './entities/customer.entity';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { LoginCustomerDto } from './dto/login-customer.dto';
+import { CustomerForgotPasswordDto, CustomerResetPasswordDto } from './dto/forgot-password.dto';
 import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class CustomersService {
+  private readonly logger = new Logger(CustomersService.name);
+
   constructor(
     @InjectRepository(Customer)
     private customerRepository: Repository<Customer>,
     private jwtService: JwtService,
     private emailService: EmailService,
+    private configService: ConfigService,
   ) {}
+
+  private hashResetToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  async forgotPassword(payload: CustomerForgotPasswordDto): Promise<{ message: string }> {
+    const genericResponse = {
+      message: 'If that email is registered, a password reset link is on its way.',
+    };
+
+    const customer = await this.findByEmail(payload.email);
+    if (!customer || !customer.isActive) return genericResponse;
+
+    const rawToken = randomBytes(32).toString('hex');
+    customer.passwordResetToken = this.hashResetToken(rawToken);
+    customer.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await this.customerRepository.save(customer);
+
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const resetUrl = `${frontendUrl}/auth/reset-password?token=${rawToken}`;
+    const displayName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'there';
+
+    await this.emailService
+      .sendPasswordResetEmail(customer.email, displayName, resetUrl, 60)
+      .catch((err) => this.logger.warn(`Reset email failed for ${customer.email}: ${err.message}`));
+
+    return genericResponse;
+  }
+
+  async resetPassword(payload: CustomerResetPasswordDto): Promise<{ message: string }> {
+    const tokenHash = this.hashResetToken(payload.token);
+    const customer = await this.customerRepository.findOne({ where: { passwordResetToken: tokenHash } });
+
+    if (!customer) {
+      throw new BadRequestException('Invalid or expired reset link');
+    }
+    if (!customer.passwordResetExpires || customer.passwordResetExpires.getTime() < Date.now()) {
+      throw new BadRequestException('Reset link has expired. Please request a new one.');
+    }
+
+    customer.password = await bcrypt.hash(payload.password, 10);
+    customer.passwordResetToken = null;
+    customer.passwordResetExpires = null;
+    await this.customerRepository.save(customer);
+
+    return { message: 'Password updated. You can now log in with your new password.' };
+  }
 
   async signup(createCustomerDto: CreateCustomerDto): Promise<{ customer: Customer; token: string }> {
     // Check if email already exists

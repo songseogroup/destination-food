@@ -7,7 +7,7 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'crypto';
 
 import { User, UserRole, VendorApprovalStatus } from '../users/entities/user.entity';
-import { LoginDto, CreateUserDto, RegisterDto, InviteAdminUserDto, SetPasswordFromInviteDto } from './dto/auth.dto';
+import { LoginDto, CreateUserDto, RegisterDto, InviteAdminUserDto, SetPasswordFromInviteDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
 import { Bar } from '../bars/entities/bar.entity';
 import { Distillery } from '../distilleries/entities/distillery.entity';
 import { Event } from '../events/entities/event.entity';
@@ -154,6 +154,51 @@ export class AuthService {
       },
       emailSent,
     };
+  }
+
+  async forgotPassword(payload: ForgotPasswordDto): Promise<{ message: string }> {
+    // Always return the same response — don't leak whether the email is registered.
+    const genericResponse = {
+      message: 'If that email is registered, a password reset link is on its way.',
+    };
+
+    const user = await this.userRepository.findOne({ where: { email: payload.email } });
+    if (!user || !user.isActive) return genericResponse;
+
+    const rawToken = randomBytes(32).toString('hex');
+    user.passwordResetTokenHash = this.hashInviteToken(rawToken);
+    user.passwordResetExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await this.userRepository.save(user);
+
+    const cmsUrl = this.configService.get<string>('CMS_ADMIN_URL') || 'http://localhost:3002';
+    const resetUrl = `${cmsUrl}/reset-password?token=${rawToken}`;
+    const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'there';
+
+    await this.emailService
+      .sendPasswordResetEmail(user.email, displayName, resetUrl, 60)
+      .catch((err) => this.logger.warn(`Reset email failed for ${user.email}: ${err.message}`));
+
+    return genericResponse;
+  }
+
+  async resetPassword(payload: ResetPasswordDto): Promise<{ message: string }> {
+    const tokenHash = this.hashInviteToken(payload.token);
+    const user = await this.userRepository.findOne({ where: { passwordResetTokenHash: tokenHash } });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset link');
+    }
+    if (!user.passwordResetExpiresAt || user.passwordResetExpiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Reset link has expired. Please request a new one.');
+    }
+
+    user.password = await bcrypt.hash(payload.password, 10);
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpiresAt = null;
+    user.passwordSetAt = new Date();
+    await this.userRepository.save(user);
+
+    return { message: 'Password updated. You can now log in with your new password.' };
   }
 
   async setPasswordFromInvite(payload: SetPasswordFromInviteDto) {

@@ -15,6 +15,7 @@ import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { LoginCustomerDto } from './dto/login-customer.dto';
+import { CustomerForgotPasswordDto, CustomerResetPasswordDto } from './dto/forgot-password.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -34,6 +35,16 @@ export class CustomersController {
   @Post('login')
   login(@Body() loginDto: LoginCustomerDto) {
     return this.customersService.login(loginDto);
+  }
+
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: CustomerForgotPasswordDto) {
+    return this.customersService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  resetPassword(@Body() dto: CustomerResetPasswordDto) {
+    return this.customersService.resetPassword(dto);
   }
 
   // Protected admin endpoints

@@ -61,6 +61,12 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   passwordSetAt?: Date;
 
+  @Column({ nullable: true })
+  passwordResetTokenHash?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  passwordResetExpiresAt?: Date;
+
   // Revenue tracking (for restaurants - no Stripe integration)
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   totalRevenue: number;

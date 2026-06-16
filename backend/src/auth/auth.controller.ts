@@ -3,7 +3,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 
 import { AuthService } from './auth.service';
-import { LoginDto, CreateUserDto, RegisterDto, InviteAdminUserDto, SetPasswordFromInviteDto } from './dto/auth.dto';
+import { LoginDto, CreateUserDto, RegisterDto, InviteAdminUserDto, SetPasswordFromInviteDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
@@ -55,6 +55,20 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Password set successfully' })
   async setPasswordFromInvite(@Body() payload: SetPasswordFromInviteDto) {
     return this.authService.setPasswordFromInvite(payload);
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request a password reset link (owners + admins)' })
+  @ApiResponse({ status: 200, description: 'Reset link sent if the email is registered' })
+  async forgotPassword(@Body() payload: ForgotPasswordDto) {
+    return this.authService.forgotPassword(payload);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Consume a password reset token (owners + admins)' })
+  @ApiResponse({ status: 200, description: 'Password updated' })
+  async resetPassword(@Body() payload: ResetPasswordDto) {
+    return this.authService.resetPassword(payload);
   }
 
   @Post('register-business')

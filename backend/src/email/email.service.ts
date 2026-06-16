@@ -160,6 +160,21 @@ export class EmailService {
   }
 
   /**
+   * Password reset email — sends the raw token in a clickable link.
+   * Caller is responsible for storing only the SHA-256 hash of the token.
+   */
+  async sendPasswordResetEmail(
+    to: string,
+    name: string,
+    resetUrl: string,
+    expiresInMinutes: number = 60,
+  ): Promise<boolean> {
+    const subject = 'Reset your Destination Whisky password';
+    const html = this.getPasswordResetTemplate(name, resetUrl, expiresInMinutes);
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
    * Welcome email for a brand-new customer or business owner.
    */
   async sendWelcomeEmail(
@@ -192,6 +207,68 @@ export class EmailService {
   /**
    * Email templates
    */
+  private getPasswordResetTemplate(name: string, resetUrl: string, expiresInMinutes: number): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Reset your Destination Whisky password</title>
+      </head>
+      <body style="margin:0;padding:0;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;color:#f4f4f5;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:32px 16px;">
+          <tr><td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#111;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;">
+              <tr>
+                <td style="padding:40px 32px;text-align:center;background:linear-gradient(135deg,#0a0a0a 0%,#1a1a1a 100%);border-bottom:2px solid #eab308;">
+                  <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                    Destination <span style="color:#eab308;">Whisky</span>
+                  </h1>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:32px;">
+                  <p style="margin:0 0 12px;font-size:20px;color:#ffffff;">Hi ${name},</p>
+                  <p style="margin:0 0 20px;font-size:15px;color:#a1a1aa;line-height:1.6;">
+                    We received a request to reset the password on your Destination Whisky account.
+                    Click the button below to choose a new one. The link expires in <strong style="color:#eab308;">${expiresInMinutes} minutes</strong>.
+                  </p>
+
+                  <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:24px auto;">
+                    <tr>
+                      <td style="background:#eab308;border-radius:8px;">
+                        <a href="${resetUrl}" style="display:inline-block;padding:14px 32px;color:#000000;font-weight:600;font-size:15px;text-decoration:none;">
+                          Reset password
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p style="margin:24px 0 0;font-size:13px;color:#71717a;line-height:1.6;">
+                    Trouble with the button? Paste this link into your browser:<br/>
+                    <a href="${resetUrl}" style="color:#eab308;word-break:break-all;">${resetUrl}</a>
+                  </p>
+
+                  <p style="margin:24px 0 0;font-size:13px;color:#71717a;line-height:1.6;">
+                    If you didn't request this, you can safely ignore this email — your password won't change unless you click the link above and choose a new one.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:24px 32px;background:#0a0a0a;border-top:1px solid #1f1f1f;text-align:center;">
+                  <p style="margin:0;font-size:12px;color:#52525b;">
+                    For your security, this link can only be used once and expires in ${expiresInMinutes} minutes.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+      </html>
+    `;
+  }
+
   private getWelcomeEmailTemplate(name: string, audience: 'customer' | 'owner'): string {
     const ctaUrl =
       audience === 'owner'
