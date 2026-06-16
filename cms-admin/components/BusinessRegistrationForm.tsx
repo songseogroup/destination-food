@@ -83,6 +83,7 @@ export default function BusinessRegistrationForm() {
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [configLoading, setConfigLoading] = useState(true)
+  const [submitError, setSubmitError] = useState<{ title: string; detail?: string; showLogin?: boolean } | null>(null)
   
   // Dynamic config from API
   const [businessTypes, setBusinessTypes] = useState<string[]>(fallbackBusinessTypes)
@@ -295,25 +296,79 @@ export default function BusinessRegistrationForm() {
 
       // Call registration API
       // Don't set Content-Type header - axios will set it automatically with boundary for FormData
+      setSubmitError(null)
       const response = await api.post('/auth/register-business', submitData)
 
       console.log('Registration response:', response.data)
       toast.success(response.data?.message || 'Registration successful!')
-      
+
       // Show password if provided (for testing)
       if (response.data?.password) {
         toast.success(`Your temporary password: ${response.data.password}`, { duration: 10000 })
       }
-      
+
       router.push('/login')
     } catch (error: any) {
       console.error('Registration error:', error)
       console.error('Error response:', error.response?.data)
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error || 
-                          error.message || 
-                          'Registration failed. Please try again.'
-      toast.error(errorMessage)
+
+      // Translate backend / transport errors into something a non-engineer can act on.
+      const status = error.response?.status as number | undefined
+      const rawMessage = error.response?.data?.message
+      const messageList: string[] = Array.isArray(rawMessage)
+        ? rawMessage
+        : rawMessage
+        ? [String(rawMessage)]
+        : []
+      const firstMessage = messageList[0]
+
+      let friendly: { title: string; detail?: string; showLogin?: boolean }
+
+      if (!error.response) {
+        // No HTTP response at all — DNS, offline, CORS preflight rejected, etc.
+        friendly = {
+          title: "Can't reach the server right now",
+          detail:
+            'Check your internet connection and try again. If this keeps happening, the platform may be temporarily unavailable.',
+        }
+      } else if (status === 409) {
+        friendly = {
+          title: 'This email is already registered',
+          detail:
+            'An account with this email already exists. If it\'s yours, sign in instead. Otherwise use a different email.',
+          showLogin: true,
+        }
+      } else if (status === 400 && messageList.length > 0) {
+        friendly = {
+          title: 'Some details need fixing',
+          detail: messageList
+            .map((m) =>
+              m
+                .replace(/^representative\./i, '')
+                .replace(/^business\./i, '')
+                .replace(/^bank\./i, ''),
+            )
+            .join(' • '),
+        }
+      } else if (status === 413) {
+        friendly = {
+          title: 'One of your uploads is too large',
+          detail: 'Logo and venue images must each be smaller than 2 MB. Try a smaller file.',
+        }
+      } else if (status && status >= 500) {
+        friendly = {
+          title: 'Something went wrong on our side',
+          detail: 'Please try again in a minute. If it keeps failing, contact support.',
+        }
+      } else {
+        friendly = {
+          title: 'Registration failed',
+          detail: firstMessage || 'Please review your details and try again.',
+        }
+      }
+
+      setSubmitError(friendly)
+      toast.error(friendly.title, { duration: 6000 })
     } finally {
       setLoading(false)
     }
@@ -826,6 +881,40 @@ export default function BusinessRegistrationForm() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Persistent error banner — doesn't auto-dismiss like the toast */}
+        {submitError && (
+          <div className="mt-8 bg-red-900/40 border border-red-700 rounded-lg p-4 flex items-start gap-3">
+            <svg className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-red-200">{submitError.title}</p>
+              {submitError.detail && (
+                <p className="mt-1 text-sm text-red-300/90 leading-relaxed">{submitError.detail}</p>
+              )}
+              {submitError.showLogin && (
+                <Link
+                  href="/login"
+                  className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary-400 hover:text-primary-300"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Sign in instead
+                </Link>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setSubmitError(null)}
+              className="p-1 text-red-400 hover:text-red-200 flex-shrink-0"
+              aria-label="Dismiss"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Navigation Buttons */}
         <div className="flex justify-between mt-8">
