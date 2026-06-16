@@ -13,12 +13,21 @@ async function bootstrap() {
 
   // Enable CORS — CORS_ORIGIN is a comma-separated list of allowed origins.
   // Defaults cover local dev so first-time runs don't have to set anything.
-  const corsOrigins = (
-    process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3002'
-  )
+  // We also strip surrounding quotes and trailing slashes per entry, because
+  // copy-pasting an env var with `"..."` wrappers is a common Railway/.env footgun.
+  const rawCors = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3002')
+    .replace(/^["']|["']$/g, ''); // strip wrapping quotes around the whole value
+  const corsOrigins = rawCors
     .split(',')
-    .map((o) => o.trim().replace(/\/$/, '')) // trim whitespace + drop any trailing slash
+    .map((o) =>
+      o
+        .trim()
+        .replace(/^["']|["']$/g, '') // strip wrapping quotes around each entry
+        .replace(/\/$/, ''),         // drop trailing slash
+    )
     .filter(Boolean);
+
+  console.log('CORS allowed origins:', corsOrigins);
 
   app.enableCors({
     origin: corsOrigins,
