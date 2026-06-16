@@ -36,7 +36,6 @@ interface FormData {
   startTime: string
 
   // Step 4: Payment & Terms
-  stripeConnected: boolean
   termsAccepted: boolean
 }
 
@@ -111,7 +110,6 @@ export default function BusinessRegistrationForm() {
     currency: 'AUD',
     availabilityDays: [],
     startTime: '',
-    stripeConnected: false,
     termsAccepted: false,
   })
 
@@ -792,26 +790,19 @@ export default function BusinessRegistrationForm() {
                 </div>
 
                 <div>
-                  <div className="bg-gray-800 border-2 border-primary-500 rounded-lg p-6">
+                  <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
                     <div className="text-center mb-4">
                       <div className="w-16 h-16 bg-primary-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg className="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                         </svg>
                       </div>
-                      <h3 className="font-semibold mb-2">Payment Setup</h3>
+                      <h3 className="font-semibold mb-2">Payouts handled for you</h3>
                       <p className="text-sm text-gray-400 mb-4">
-                        ByFoods uses Stripe to handle secure payments and payouts.
+                        We&apos;ll set up your payout account for you once your profile is approved by our team.
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => updateFormData('stripeConnected', true)}
-                        className="w-full bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                      >
-                        {formData.stripeConnected ? 'Stripe Connected' : 'Connect Stripe account'}
-                      </button>
-                      <p className="text-xs text-gray-500 mt-2">
-                        If you don't have a Stripe account yet, you can create one in a few minutes.
+                      <p className="text-xs text-gray-500">
+                        After approval, sign in to your admin portal and go to <strong className="text-gray-300">Finance</strong> to verify your business details and start receiving payouts.
                       </p>
                     </div>
                   </div>
