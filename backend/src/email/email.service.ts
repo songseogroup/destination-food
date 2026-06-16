@@ -9,14 +9,19 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor(private configService: ConfigService) {
-    // Initialize email transporter
+    // Strip surrounding quotes + all whitespace from secrets — Railway env vars sometimes
+    // get pasted with spaces ("quwy dxmu ztrp ikot") or wrapping quotes, both of which
+    // Gmail rejects as "Invalid login: 535-5.7.8". Cleaning here is defensive.
+    const cleanSecret = (raw?: string) =>
+      (raw || '').replace(/^["']|["']$/g, '').replace(/\s+/g, '');
+
     const emailConfig = {
       host: this.configService.get<string>('SMTP_HOST') || 'smtp.gmail.com',
       port: parseInt(this.configService.get<string>('SMTP_PORT') || '587'),
       secure: this.configService.get<string>('SMTP_SECURE') === 'true', // true for 465, false for other ports
       auth: {
-        user: this.configService.get<string>('SMTP_USER'),
-        pass: this.configService.get<string>('SMTP_PASSWORD'),
+        user: (this.configService.get<string>('SMTP_USER') || '').replace(/^["']|["']$/g, '').trim(),
+        pass: cleanSecret(this.configService.get<string>('SMTP_PASSWORD')),
       },
     };
 
