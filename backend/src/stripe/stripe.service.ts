@@ -397,6 +397,125 @@ export class StripeService {
   }
 
   /**
+   * Upload one side of the owner's identity document (driver's license / passport / ID card).
+   * The platform handles the Stripe-side compliance flow on their behalf — owners just
+   * upload front and back, and we ship them to Stripe with the correct purpose and
+   * patch individual.verification.document.{front,back} on the connected account.
+   */
+  async uploadIdentityDocument(
+    userId: number,
+    side: 'front' | 'back',
+    file: Express.Multer.File,
+  ): Promise<{ uploaded: boolean; side: 'front' | 'back'; fileId: string }> {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+    if (side !== 'front' && side !== 'back') {
+      throw new BadRequestException('side must be "front" or "back"');
+    }
+
+    let account = await this.stripeAccountRepository.findOne({ where: { userId } });
+    if (!account) {
+      const created = await this.ensureOrCreateStripeAccount(userId);
+      account = created.account;
+    }
+
+    try {
+      const uploadedFile = await this.stripe.files.create({
+        purpose: 'identity_document',
+        file: {
+          data: file.buffer,
+          name: file.originalname,
+          type: file.mimetype,
+        } as any,
+      });
+
+      await this.stripe.accounts.update(account.stripeAccountId, {
+        individual: {
+          verification: {
+            document: {
+              [side]: uploadedFile.id,
+            },
+          },
+        },
+      } as any);
+
+      const accountRecord = await this.stripeAccountRepository.findOne({ where: { userId } });
+      if (accountRecord) {
+        const existing = accountRecord.verificationDetails || {};
+        const identity = (existing as any).identityDocument || {};
+        const previous = identity[side];
+        const history = Array.isArray(previous?.history) ? [...previous.history] : [];
+        if (previous?.fileId) {
+          history.push({
+            fileId: previous.fileId,
+            uploadedAt: previous.uploadedAt,
+            filename: previous.filename,
+          });
+        }
+        accountRecord.verificationDetails = {
+          ...existing,
+          identityDocument: {
+            ...identity,
+            [side]: {
+              fileId: uploadedFile.id,
+              uploadedAt: new Date().toISOString(),
+              filename: file.originalname,
+              history,
+            },
+          },
+        };
+        await this.stripeAccountRepository.save(accountRecord);
+      }
+
+      await this.getAccountStatus(userId);
+      return { uploaded: true, side, fileId: uploadedFile.id };
+    } catch (error) {
+      this.logger.error(`Error uploading identity document: ${error.message}`, error.stack);
+      throw new BadRequestException(`Failed to upload identity document: ${error.message}`);
+    }
+  }
+
+  /**
+   * SuperAdmin view: return whatever identity-document metadata + Stripe file links exist
+   * for a given vendor. The returned URLs are short-lived Stripe FileLink URLs that the
+   * SuperAdmin can use to view/download the uploaded ID.
+   */
+  async getIdentityDocumentsForVendor(userId: number): Promise<{
+    front?: { fileId: string; uploadedAt: string; filename: string; url?: string };
+    back?: { fileId: string; uploadedAt: string; filename: string; url?: string };
+  }> {
+    const account = await this.stripeAccountRepository.findOne({ where: { userId } });
+    if (!account) {
+      throw new NotFoundException('No Stripe account for this vendor');
+    }
+    const identity = (account.verificationDetails as any)?.identityDocument || {};
+
+    const result: Record<string, any> = {};
+    for (const side of ['front', 'back'] as const) {
+      const entry = identity[side];
+      if (!entry?.fileId) continue;
+      let url: string | undefined;
+      try {
+        const link = await this.stripe.fileLinks.create({
+          file: entry.fileId,
+          expires_at: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour
+        });
+        url = link.url || undefined;
+      } catch (err) {
+        this.logger.warn(`Could not create FileLink for ${entry.fileId}: ${err.message}`);
+      }
+      result[side] = {
+        fileId: entry.fileId,
+        uploadedAt: entry.uploadedAt,
+        filename: entry.filename,
+        url,
+      };
+    }
+    return result;
+  }
+
+  /**
    * Create payment intent for event/tour booking
    */
   async createPaymentIntent(orderId: number, _amount: number, currency: string = 'aud'): Promise<{ clientSecret: string; paymentIntentId: string }> {

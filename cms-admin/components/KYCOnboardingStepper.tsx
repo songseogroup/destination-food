@@ -101,21 +101,41 @@ export function KYCOnboardingStepper() {
       onSuccess: (data) => {
         queryClient.invalidateQueries('stripe-account-status')
         if (data.created) {
-          toast.success('Stripe account created successfully!')
+          toast.success('Payout account created successfully!')
         }
       },
       onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Failed to create Stripe account')
+        toast.error(error.response?.data?.message || 'Failed to create payout account')
       },
     }
   )
 
-  // Auto-create Stripe account if it doesn't exist on component mount
+  // Auto-create payout account if it doesn't exist on component mount
   useEffect(() => {
     if (!isLoading && !accountStatus) {
       createAccountMutation.mutate()
     }
   }, [isLoading, accountStatus])
+
+  const uploadIdentityDocumentMutation = useMutation(
+    async (payload: { side: 'front' | 'back'; file: File }) => {
+      const formData = new FormData()
+      formData.append('side', payload.side)
+      formData.append('file', payload.file)
+      const response = await api.post('/stripe/connect/identity-verification', formData)
+      return response.data
+    },
+    {
+      onSuccess: (_, variables) => {
+        toast.success(`ID ${variables.side === 'front' ? 'front' : 'back'} uploaded`)
+        setSelectedFiles((prev) => ({ ...prev, [`identity_${variables.side}`]: null }))
+        queryClient.invalidateQueries('stripe-account-status')
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.message || 'Failed to upload ID document')
+      },
+    },
+  )
 
   const submitCustomOnboardingMutation = useMutation(
     async () => {
@@ -124,7 +144,7 @@ export function KYCOnboardingStepper() {
     },
     {
       onSuccess: () => {
-        toast.success('Onboarding details submitted. Stripe verification is now processing.')
+        toast.success('Business details submitted. Verification is now in progress.')
         queryClient.invalidateQueries('stripe-account-status')
       },
       onError: (error: any) => {
@@ -210,11 +230,11 @@ export function KYCOnboardingStepper() {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="text-center">
           <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Setting Up Stripe</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Setting up your payout account</h3>
           <p className="text-gray-600 mb-6">
-            {createAccountMutation.isLoading 
-              ? 'Creating your Stripe Connect account...'
-              : 'Create your Stripe Connect account to start receiving payments for your events and tours.'}
+            {createAccountMutation.isLoading
+              ? 'Creating your payout account...'
+              : 'Create your payout account to start receiving money from bookings.'}
           </p>
           {createAccountMutation.isLoading ? (
             <div className="flex items-center justify-center">
@@ -227,7 +247,7 @@ export function KYCOnboardingStepper() {
               disabled={createAccountMutation.isLoading}
               className="px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create Stripe Account
+              Create payout account
             </button>
           )}
         </div>
@@ -252,24 +272,20 @@ export function KYCOnboardingStepper() {
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Stripe Onboarding</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Identity &amp; Payouts</h2>
         <p className="text-gray-600">
-          Complete the steps below to enable payments and payouts for your account.
+          Complete the steps below to verify your identity and start receiving payouts.
         </p>
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-          <p className="font-medium text-gray-900 mb-2">Stripe Connect onboarding</p>
-          <p className="mb-3">
-            Complete onboarding directly here in cms-admin. The data is submitted to Stripe Connect for AU payouts,
-            and any missing compliance requirements are shown under verification.
-          </p>
+          <p className="font-medium text-gray-900 mb-2">What you&apos;ll need</p>
           <ul className="list-disc list-inside space-y-1 text-gray-600">
-            <li>Business type and trading or event-hosting details</li>
-            <li>Representative identity verification</li>
-            <li>Bank account for payouts (AUD)</li>
-            <li>Tax and regulatory details when applicable</li>
+            <li>Your business name and type</li>
+            <li>Your name, email, and phone number</li>
+            <li>An Australian bank account for payouts (AUD)</li>
+            <li>A photo of the front and back of your ID (driver&apos;s licence, passport, or national ID)</li>
           </ul>
           <p className="mt-3 text-xs text-gray-500">
-            Default payout cadence is weekly. Final availability depends on Stripe verification and account state.
+            Payouts are sent weekly. We&apos;ll let you know if anything else is needed to verify your account.
           </p>
         </div>
       </div>
@@ -673,9 +689,74 @@ export function KYCOnboardingStepper() {
                 </div>
               )}
 
+              {/* Always-visible ID upload — owners don't need a Stripe prompt to start this */}
+              <div className="border border-gray-200 rounded-lg p-4 mb-4">
+                <p className="text-sm font-medium text-gray-900 mb-1">Upload your ID</p>
+                <p className="text-xs text-gray-600 mb-3">
+                  Driver&apos;s licence, passport, or national ID. JPG/PNG/PDF, max 10MB per side.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {(['front', 'back'] as const).map((side) => {
+                    const identity = (accountStatus.verificationDetails as any)?.identityDocument || {}
+                    const uploaded = identity[side]
+                    const selectedKey = `identity_${side}`
+                    return (
+                      <div key={side} className="border border-gray-100 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-medium text-gray-700">
+                            ID {side === 'front' ? 'front' : 'back'}
+                          </p>
+                          {uploaded?.fileId && (
+                            <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                              Uploaded
+                            </span>
+                          )}
+                        </div>
+                        {uploaded?.filename && (
+                          <p className="text-xs text-gray-500 mb-2 truncate">
+                            Current: {uploaded.filename}
+                          </p>
+                        )}
+                        <div className="flex flex-col gap-2">
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={(e) =>
+                              setSelectedFiles((prev) => ({
+                                ...prev,
+                                [selectedKey]: e.target.files?.[0] || null,
+                              }))
+                            }
+                            className="text-sm"
+                          />
+                          <button
+                            onClick={() => {
+                              const file = selectedFiles[selectedKey]
+                              if (!file) {
+                                toast.error('Please choose a file first')
+                                return
+                              }
+                              uploadIdentityDocumentMutation.mutate({ side, file })
+                            }}
+                            disabled={uploadIdentityDocumentMutation.isLoading}
+                            className="inline-flex items-center justify-center gap-1 px-3 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 text-sm"
+                          >
+                            <Upload className="h-4 w-4" />
+                            {uploaded?.fileId ? 'Replace' : 'Upload'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  Your ID is sent securely to our payments provider for verification. You won&apos;t see it again after upload.
+                </p>
+              </div>
+
               {documentRequirements.length > 0 && (
                 <div className="border border-gray-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm font-medium text-gray-900 mb-3">Upload required documents</p>
+                  <p className="text-sm font-medium text-gray-900 mb-3">Additional documents requested</p>
                   <div className="space-y-3">
                     {documentRequirements.map((req: string) => (
                       <div key={req} className="border border-gray-100 rounded-lg p-3">

@@ -85,8 +85,23 @@ export class StripeAccount {
         fileId: string;
         uploadedAt: string;
         filename: string;
+        history?: Array<{ fileId: string; uploadedAt: string; filename: string }>;
       }
     >;
+    identityDocument?: {
+      front?: {
+        fileId: string;
+        uploadedAt: string;
+        filename: string;
+        history?: Array<{ fileId: string; uploadedAt: string; filename: string }>;
+      };
+      back?: {
+        fileId: string;
+        uploadedAt: string;
+        filename: string;
+        history?: Array<{ fileId: string; uploadedAt: string; filename: string }>;
+      };
+    };
   };
 
   @Column({ nullable: true })

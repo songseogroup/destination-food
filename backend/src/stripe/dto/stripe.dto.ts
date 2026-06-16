@@ -122,6 +122,11 @@ export class UploadRequirementDocumentDto {
   requirement: string;
 }
 
+export class UploadIdentityDocumentDto {
+  @IsIn(['front', 'back'])
+  side: 'front' | 'back';
+}
+
 export class UpdatePricingConfigDto {
   @IsOptional()
   @IsNumber()

@@ -2,11 +2,22 @@
 
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
-import { CheckCircle2, XCircle, PauseCircle, PlayCircle, Loader2, Filter } from 'lucide-react'
+import { CheckCircle2, XCircle, PauseCircle, PlayCircle, Loader2, Filter, FileText, X, ExternalLink } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
 import { roleLabels } from '@/lib/roles'
+
+interface IdentityDoc {
+  fileId: string
+  uploadedAt: string
+  filename: string
+  url?: string
+}
+interface IdentityDocs {
+  front?: IdentityDoc
+  back?: IdentityDoc
+}
 
 interface Vendor {
   id: number
@@ -33,6 +44,23 @@ export default function VendorAdminPage() {
   const queryClient = useQueryClient()
   const [roleFilter, setRoleFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [kycVendor, setKycVendor] = useState<Vendor | null>(null)
+  const [kycDocs, setKycDocs] = useState<IdentityDocs | null>(null)
+  const [kycLoading, setKycLoading] = useState(false)
+
+  const openKycModal = async (vendor: Vendor) => {
+    setKycVendor(vendor)
+    setKycDocs(null)
+    setKycLoading(true)
+    try {
+      const res = await api.get(`/stripe/admin/vendors/${vendor.id}/identity-documents`)
+      setKycDocs(res.data)
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Could not load documents')
+    } finally {
+      setKycLoading(false)
+    }
+  }
 
   const { data: vendors = [], isLoading } = useQuery<Vendor[]>(
     ['admin-vendors', roleFilter, statusFilter],
@@ -170,6 +198,13 @@ export default function VendorAdminPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1 justify-end">
+                      <button
+                        title="View KYC documents"
+                        onClick={() => openKycModal(v)}
+                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </button>
                       {v.approvalStatus !== 'approved' && (
                         <button
                           title="Approve"
@@ -223,6 +258,104 @@ export default function VendorAdminPage() {
           </table>
         )}
       </div>
+
+      {/* KYC documents modal */}
+      {kycVendor && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={() => setKycVendor(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  KYC documents — {kycVendor.firstName} {kycVendor.lastName}
+                </h3>
+                <p className="text-xs text-gray-500">{kycVendor.email}</p>
+              </div>
+              <button
+                onClick={() => setKycVendor(null)}
+                className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {kycLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+                </div>
+              ) : !kycDocs || (!kycDocs.front && !kycDocs.back) ? (
+                <div className="text-center py-12">
+                  <FileText className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-700 font-medium">No identity documents uploaded</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    The vendor hasn&apos;t uploaded their ID yet. Once they do, you&apos;ll be able to view both sides here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(['front', 'back'] as const).map((side) => {
+                    const doc = kycDocs?.[side]
+                    return (
+                      <div key={side} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="font-medium text-gray-900">ID {side}</p>
+                          {doc?.fileId ? (
+                            <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                              Uploaded
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                              Missing
+                            </span>
+                          )}
+                        </div>
+                        {doc?.fileId ? (
+                          <>
+                            <p className="text-xs text-gray-500 truncate mb-1">
+                              <strong>File:</strong> {doc.filename}
+                            </p>
+                            <p className="text-xs text-gray-500 mb-3">
+                              <strong>Uploaded:</strong>{' '}
+                              {new Date(doc.uploadedAt).toLocaleString()}
+                            </p>
+                            {doc.url ? (
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-3 py-2 bg-primary-500 text-white text-sm rounded-lg hover:bg-primary-600"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                View document
+                              </a>
+                            ) : (
+                              <p className="text-xs text-gray-500 italic">
+                                View link unavailable. File ID: {doc.fileId}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-500">Not yet uploaded by the vendor.</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+                View links expire after 1 hour. Reopen this modal to get a fresh link.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

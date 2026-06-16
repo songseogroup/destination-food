@@ -7,7 +7,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { StripeService } from './stripe.service';
-import { CreatePaymentIntentDto, RequestPayoutDto, RequestRefundDto, ProcessRefundDto, ApprovePayoutDto, RejectPayoutDto, SubmitCustomOnboardingDto, UploadRequirementDocumentDto, UpdatePricingConfigDto } from './dto/stripe.dto';
+import { CreatePaymentIntentDto, RequestPayoutDto, RequestRefundDto, ProcessRefundDto, ApprovePayoutDto, RejectPayoutDto, SubmitCustomOnboardingDto, UploadRequirementDocumentDto, UploadIdentityDocumentDto, UpdatePricingConfigDto } from './dto/stripe.dto';
 
 @ApiTags('Stripe')
 @Controller('stripe')
@@ -81,6 +81,37 @@ export class StripeController {
     @Request() req,
   ) {
     return await this.stripeService.uploadRequirementDocument(req.user.id, dto.requirement, file);
+  }
+
+  @Post('connect/identity-verification')
+  @Roles(UserRole.EVENT_HOST, UserRole.TOUR_OPERATOR, UserRole.DISTILLERY, UserRole.BAR)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (req, file, callback) => {
+        const allowed = /\/(jpg|jpeg|png|webp|pdf)$/.test(file.mimetype) || file.mimetype === 'application/pdf';
+        if (!allowed) {
+          return callback(new Error('Only JPG, PNG, WebP, or PDF files are allowed'), false);
+        }
+        callback(null, true);
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload ID document (front or back) — platform handles Stripe verification' })
+  async uploadIdentityDocument(
+    @Body() dto: UploadIdentityDocumentDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
+    return await this.stripeService.uploadIdentityDocument(req.user.id, dto.side, file);
+  }
+
+  @Get('admin/vendors/:userId/identity-documents')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'SuperAdmin: get a vendor identity documents with short-lived viewer URLs' })
+  async getVendorIdentityDocuments(@Param('userId') userId: string) {
+    return await this.stripeService.getIdentityDocumentsForVendor(parseInt(userId));
   }
 
   @Post('payment-intent')
