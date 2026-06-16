@@ -11,14 +11,17 @@ async function bootstrap() {
     rawBody: true, // Enable raw body for Stripe webhooks
   });
 
-  // Enable CORS
+  // Enable CORS — CORS_ORIGIN is a comma-separated list of allowed origins.
+  // Defaults cover local dev so first-time runs don't have to set anything.
+  const corsOrigins = (
+    process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3002'
+  )
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, '')) // trim whitespace + drop any trailing slash
+    .filter(Boolean);
+
   app.enableCors({
-    origin: [
-      process.env.CORS_ORIGIN || 'http://localhost:3000',
-      'http://localhost:3002', // CMS Admin
-      'http://localhost:3000', // Main Project
-      'https://dashboard-byfoods.vercel.app', // ✅ trailing slash hatao
-    ],
+    origin: corsOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
