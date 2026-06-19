@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import Header from '../../../components/Header'
 import Footer from '../../../components/Footer'
 import LoadingSpinner from '../../../components/LoadingSpinner'
-import { apiService } from '../../../lib/api'
+import { apiService, api } from '../../../lib/api'
 import { Blog } from '../../../lib/types'
 
 export default function BlogDetailPage() {
@@ -22,11 +22,15 @@ export default function BlogDetailPage() {
         setLoading(true)
         const response = await apiService.getBlog(Number(id))
         setBlogPost(response.data)
-        
+
+        // Track this read — fire-and-forget so a tracking outage never
+        // breaks the page. Only fires on the first mount per blog id.
+        api.post(`/blogs/${Number(id)}/view`).catch(() => undefined)
+
         // Fetch related posts (same category, excluding current post)
-        const relatedResponse = await apiService.getBlogs({ 
+        const relatedResponse = await apiService.getBlogs({
           category: response.data.category,
-          limit: 4 
+          limit: 4
         })
         const related = (relatedResponse.data.data || []).filter((post: Blog) => post.id !== Number(id))
         setRelatedPosts(related.slice(0, 3))

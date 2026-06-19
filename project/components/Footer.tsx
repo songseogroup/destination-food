@@ -67,6 +67,11 @@ export default function Footer() {
                   About
                 </a>
               </li>
+              <li>
+                <a href="/feedback" className="text-gray-400 hover:text-white transition-colors">
+                  Send feedback
+                </a>
+              </li>
             </ul>
           </div>
 

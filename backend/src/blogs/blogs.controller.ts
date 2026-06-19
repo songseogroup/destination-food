@@ -85,6 +85,12 @@ export class BlogsController {
     return this.blogsService.findOne(id);
   }
 
+  @Post(':id/view')
+  @ApiOperation({ summary: 'Track a public view of a blog post (no auth)' })
+  async trackView(@Param('id', ParseIntPipe) id: number) {
+    return this.blogsService.incrementView(id);
+  }
+
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

@@ -15,6 +15,20 @@ const VENDOR_ROLES = [
   UserRole.TOUR_OPERATOR,
 ];
 
+const ADMIN_ROLES = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
+
+export interface AdminUserRow {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  isActive: boolean;
+  passwordSetAt: Date | null;
+  inviteAccepted: boolean;
+  createdAt: Date;
+}
+
 export interface VendorRow {
   id: number;
   email: string;
@@ -127,6 +141,80 @@ export class AdminService {
         this.eventRepo.update({ userId }, { isActive: false }),
       ]);
     }
+    return this.userRepo.save(user);
+  }
+
+  /** Admin/SuperAdmin staff management — SuperAdmin only. */
+  async listAdminUsers(): Promise<AdminUserRow[]> {
+    const users = await this.userRepo.find({
+      where: { role: In(ADMIN_ROLES) },
+      order: { createdAt: 'DESC' },
+    });
+    return users.map<AdminUserRow>((u) => ({
+      id: u.id,
+      email: u.email,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      role: u.role,
+      isActive: u.isActive,
+      passwordSetAt: u.passwordSetAt || null,
+      // If they've accepted their invite (set a password) inviteAccepted is true.
+      inviteAccepted: !!u.passwordSetAt,
+      createdAt: u.createdAt,
+    }));
+  }
+
+  async setAdminRole(
+    targetUserId: number,
+    newRole: UserRole.ADMIN | UserRole.SUPER_ADMIN,
+    actorUserId: number,
+  ): Promise<User> {
+    if (!ADMIN_ROLES.includes(newRole)) {
+      throw new BadRequestException('Role must be admin or super_admin');
+    }
+    const user = await this.userRepo.findOne({ where: { id: targetUserId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (!ADMIN_ROLES.includes(user.role)) {
+      throw new BadRequestException('Can only change role on admin / super_admin users');
+    }
+    // Guard: prevent SuperAdmin from demoting themselves (they could lock
+    // themselves out of admin features). They have to promote a peer first.
+    if (user.id === actorUserId && user.role === UserRole.SUPER_ADMIN && newRole !== UserRole.SUPER_ADMIN) {
+      throw new BadRequestException(
+        'You can\'t demote yourself. Promote another admin to SuperAdmin first, then ask them to demote you.',
+      );
+    }
+    // Guard: prevent demoting the last remaining SuperAdmin.
+    if (user.role === UserRole.SUPER_ADMIN && newRole !== UserRole.SUPER_ADMIN) {
+      const remaining = await this.userRepo.count({ where: { role: UserRole.SUPER_ADMIN } });
+      if (remaining <= 1) {
+        throw new BadRequestException(
+          'Cannot demote the last remaining SuperAdmin. Promote another admin first.',
+        );
+      }
+    }
+    user.role = newRole;
+    return this.userRepo.save(user);
+  }
+
+  async setAdminActive(targetUserId: number, isActive: boolean, actorUserId: number): Promise<User> {
+    const user = await this.userRepo.findOne({ where: { id: targetUserId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (!ADMIN_ROLES.includes(user.role)) {
+      throw new BadRequestException('This endpoint is for admin / super_admin users only');
+    }
+    if (user.id === actorUserId && !isActive) {
+      throw new BadRequestException('You can\'t suspend yourself.');
+    }
+    if (user.role === UserRole.SUPER_ADMIN && !isActive) {
+      const remainingActive = await this.userRepo.count({
+        where: { role: UserRole.SUPER_ADMIN, isActive: true },
+      });
+      if (remainingActive <= 1) {
+        throw new BadRequestException('Cannot suspend the last active SuperAdmin.');
+      }
+    }
+    user.isActive = isActive;
     return this.userRepo.save(user);
   }
 }

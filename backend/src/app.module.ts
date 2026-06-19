@@ -24,6 +24,7 @@ import { AdminModule } from './admin/admin.module';
 import { BannersModule } from './banners/banners.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { FeedbackModule } from './feedback/feedback.module';
 
 // Entities
 import { User } from './users/entities/user.entity';
@@ -43,6 +44,7 @@ import { PlatformConfig } from './platform-config/entities/platform-config.entit
 import { Customer } from './customers/entities/customer.entity';
 import { Banner } from './banners/entities/banner.entity';
 import { Review } from './reviews/entities/review.entity';
+import { Feedback } from './feedback/entities/feedback.entity';
 
 @Module({
   imports: [
@@ -71,6 +73,7 @@ import { Review } from './reviews/entities/review.entity';
         Customer,
         Banner,
         Review,
+        Feedback,
       ],
       synchronize: process.env.NODE_ENV === 'development',
       logging: process.env.NODE_ENV === 'development',
@@ -98,6 +101,7 @@ import { Review } from './reviews/entities/review.entity';
     BannersModule,
     NotificationsModule,
     ReviewsModule,
+    FeedbackModule,
   ],
 })
 export class AppModule {}

@@ -48,18 +48,26 @@ export class BlogsService {
   }
 
   async findOne(id: number): Promise<Blog> {
-    const blog = await this.blogRepository.findOne({ 
-      where: { id, isActive: true } 
+    const blog = await this.blogRepository.findOne({
+      where: { id, isActive: true }
     });
     if (!blog) {
       throw new NotFoundException(`Blog with ID ${id} not found`);
     }
-    
-    // Increment view count
-    blog.views += 1;
-    await this.blogRepository.save(blog);
-    
+    // Note: views are NOT incremented here. Admin fetches (for editing) hit
+    // this path too, and we don't want to pollute analytics. Real customer
+    // reads go through incrementView() called from the public website.
     return blog;
+  }
+
+  async incrementView(id: number): Promise<{ views: number }> {
+    const blog = await this.blogRepository.findOne({ where: { id, isActive: true } });
+    if (!blog) {
+      throw new NotFoundException(`Blog with ID ${id} not found`);
+    }
+    // Single SQL update — atomic and faster than load-then-save.
+    await this.blogRepository.increment({ id }, 'views', 1);
+    return { views: (blog.views || 0) + 1 };
   }
 
   async update(id: number, updateBlogDto: UpdateBlogDto): Promise<Blog> {
