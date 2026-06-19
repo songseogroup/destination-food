@@ -56,11 +56,19 @@ export class OrdersService {
   }
 
   async create(createOrderDto: CreateOrderDto, customerId: number): Promise<Order> {
+    // Defensive: a falsy customerId here is almost always a bug in the
+    // calling controller (wrong req.user field). TypeORM would otherwise
+    // happily return the first active customer for findOne({ id: undefined })
+    // and silently save the order with customerId=null.
+    if (!customerId || typeof customerId !== 'number') {
+      throw new UnauthorizedException('Customer ID missing — please sign in again.');
+    }
+
     // Validate customer exists and is active
     const customer = await this.customerRepository.findOne({
       where: { id: customerId, isActive: true }
     });
-    
+
     if (!customer) {
       throw new UnauthorizedException('Customer account not found or inactive');
     }

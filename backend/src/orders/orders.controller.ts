@@ -36,8 +36,11 @@ export class OrdersController {
   @ApiResponse({ status: 400, description: 'Invalid order data' })
   @ApiResponse({ status: 401, description: 'Unauthorized - Customer must be logged in' })
   async create(@Body() createOrderDto: CreateOrderDto, @Request() req) {
-    // req.user.sub contains the customer ID from JWT token
-    return this.ordersService.create(createOrderDto, req.user.sub);
+    // JwtStrategy.validate() returns { id, email, role } — the JWT's `sub`
+    // claim is renamed to `id`. Reading req.user.sub here silently passed
+    // undefined into ordersService.create() and every order was saved with
+    // customerId=null, breaking the "my bookings" page.
+    return this.ordersService.create(createOrderDto, req.user.id);
   }
 
   @Get()
