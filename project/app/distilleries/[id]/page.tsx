@@ -8,10 +8,9 @@ import Header from '../../../components/Header'
 import Footer from '../../../components/Footer'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import StripePayment from '../../../components/StripePayment'
+import ReviewsSection from '../../../components/ReviewsSection'
 import { apiService } from '../../../lib/api'
 import { Distillery } from '../../../lib/types'
-
-const reviews: any[] = []
 
 
 export default function DistilleryDetailPage() {
@@ -373,46 +372,12 @@ export default function DistilleryDetailPage() {
                   </motion.div>
                 )}
 
-                {activeTab === 'reviews' && (
+                {activeTab === 'reviews' && distillery && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="space-y-6"
                   >
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-bold">Reviews</h2>
-                    </div>
-
-                    <div className="space-y-6">
-                      {reviews.map((review) => (
-                        <div key={review.id} className="bg-gray-900 p-6 rounded-lg">
-                          <div className="flex items-start space-x-4">
-                            <img
-                              src={review.avatar}
-                              alt={review.name}
-                              className="w-12 h-12 rounded-full"
-                            />
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between mb-2">
-                                <h3 className="font-semibold">{review.name}</h3>
-                                <div className="flex items-center space-x-1">
-                                  {[...Array(5)].map((_, i) => (
-                                    <Star
-                                      key={i}
-                                      className={`w-4 h-4 ${
-                                        i < review.rating ? 'text-yellow-500 fill-current' : 'text-gray-600'
-                                      }`}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                              <p className="text-gray-300 mb-2">{review.comment}</p>
-                              <p className="text-gray-500 text-sm">{review.date}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <ReviewsSection entityType="distillery" entityId={distillery.id} />
                   </motion.div>
                 )}
               </div>

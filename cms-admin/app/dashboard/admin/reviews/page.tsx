@@ -1,0 +1,166 @@
+'use client'
+
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from 'react-query'
+import { Star, EyeOff, Eye, Loader2, MessageCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { api } from '@/lib/api'
+import { auth } from '@/lib/auth'
+
+interface AdminReview {
+  id: number
+  customerName: string
+  rating: number
+  comment: string
+  ownerReply?: string | null
+  entityType: 'bar' | 'distillery' | 'event'
+  entityId: number
+  createdAt: string
+  isHidden: boolean
+}
+
+function StarRow({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Star
+          key={i}
+          className={`h-4 w-4 ${i <= rating ? 'fill-primary-500 text-primary-500' : 'text-gray-300'}`}
+        />
+      ))}
+    </div>
+  )
+}
+
+export default function AdminReviewsPage() {
+  const user = auth.getUser()
+  const queryClient = useQueryClient()
+  const [filter, setFilter] = useState<'all' | 'visible' | 'hidden'>('all')
+
+  const { data: reviews = [], isLoading } = useQuery<AdminReview[]>(
+    ['admin-reviews', filter],
+    async () => {
+      const params: Record<string, string> = {}
+      if (filter === 'hidden') params.hidden = 'true'
+      if (filter === 'visible') params.hidden = 'false'
+      return (await api.get('/admin/reviews', { params })).data
+    },
+    { enabled: user?.role === 'super_admin' },
+  )
+
+  const hideMutation = useMutation(
+    async ({ id, hidden }: { id: number; hidden: boolean }) =>
+      (await api.patch(`/admin/reviews/${id}/${hidden ? 'hide' : 'unhide'}`)).data,
+    {
+      onSuccess: (_, vars) => {
+        toast.success(vars.hidden ? 'Review hidden' : 'Review restored')
+        queryClient.invalidateQueries(['admin-reviews', filter])
+      },
+      onError: (err: any) => {
+        toast.error(err.response?.data?.message || 'Update failed')
+      },
+    },
+  )
+
+  if (user?.role !== 'super_admin') {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+        <p className="font-medium text-red-800">SuperAdmin only</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Review Moderation</h1>
+        <p className="text-gray-600 mt-1">Hide reviews that violate guidelines. Hidden reviews don&apos;t count toward ratings.</p>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-center gap-3">
+        {(['all', 'visible', 'hidden'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
+              filter === f
+                ? 'bg-primary-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+        <span className="ml-auto text-sm text-gray-500">{reviews.length} reviews</span>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        {isLoading ? (
+          <div className="p-12 flex justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="p-16 text-center">
+            <MessageCircle className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-700 font-medium">No reviews match this filter</p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-gray-200">
+            {reviews.map((r) => (
+              <li key={r.id} className={`p-5 ${r.isHidden ? 'opacity-60' : ''}`}>
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <p className="font-semibold text-gray-900">{r.customerName}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(r.createdAt).toLocaleDateString()} ·{' '}
+                      <span className="capitalize">{r.entityType}</span> #{r.entityId}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StarRow rating={r.rating} />
+                    {r.isHidden && (
+                      <span className="text-xs px-2 py-0.5 bg-red-100 text-red-800 rounded-full font-medium">
+                        Hidden
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{r.comment}</p>
+                {r.ownerReply && (
+                  <div className="mt-3 pl-3 border-l-2 border-primary-500/50">
+                    <p className="text-xs font-medium text-primary-700 mb-0.5">Owner&apos;s reply</p>
+                    <p className="text-sm text-gray-700">{r.ownerReply}</p>
+                  </div>
+                )}
+                <div className="mt-3 flex justify-end">
+                  {r.isHidden ? (
+                    <button
+                      onClick={() => hideMutation.mutate({ id: r.id, hidden: false })}
+                      disabled={hideMutation.isLoading}
+                      className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-50"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Unhide
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (!confirm('Hide this review? It won\'t count toward the rating.')) return
+                        hideMutation.mutate({ id: r.id, hidden: true })
+                      }}
+                      disabled={hideMutation.isLoading}
+                      className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                    >
+                      <EyeOff className="h-3.5 w-3.5" />
+                      Hide
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}

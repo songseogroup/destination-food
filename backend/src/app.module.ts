@@ -23,6 +23,7 @@ import { EmailModule } from './email/email.module';
 import { AdminModule } from './admin/admin.module';
 import { BannersModule } from './banners/banners.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 // Entities
 import { User } from './users/entities/user.entity';
@@ -41,6 +42,7 @@ import { PricingConfig } from './stripe/entities/pricing-config.entity';
 import { PlatformConfig } from './platform-config/entities/platform-config.entity';
 import { Customer } from './customers/entities/customer.entity';
 import { Banner } from './banners/entities/banner.entity';
+import { Review } from './reviews/entities/review.entity';
 
 @Module({
   imports: [
@@ -68,6 +70,7 @@ import { Banner } from './banners/entities/banner.entity';
         PlatformConfig,
         Customer,
         Banner,
+        Review,
       ],
       synchronize: process.env.NODE_ENV === 'development',
       logging: process.env.NODE_ENV === 'development',
@@ -94,6 +97,7 @@ import { Banner } from './banners/entities/banner.entity';
     AdminModule,
     BannersModule,
     NotificationsModule,
+    ReviewsModule,
   ],
 })
 export class AppModule {}
