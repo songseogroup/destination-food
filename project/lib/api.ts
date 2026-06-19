@@ -46,6 +46,9 @@ export const apiService = {
   createOrder: (orderData: any) => api.post(endpoints.orders, orderData),
   getMyOrders: () => api.get(`${endpoints.orders}/my-orders`),
   getOrder: (id: number) => api.get(`${endpoints.orders}/${id}`),
+  // Customer-scoped — the JWT identifies the caller
+  getMyCustomerOrders: () => api.get(`${endpoints.orders}/customer/mine`),
+  getMyCustomerOrder: (id: number) => api.get(`${endpoints.orders}/customer/mine/${id}`),
   
   // Customer Auth
   loginCustomer: (email: string, password: string) => api.post(`${endpoints.customers}/login`, { email, password }),

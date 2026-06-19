@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException,
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Order, OrderStatus } from './entities/order.entity';
+import { Order, OrderStatus, OrderType } from './entities/order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -11,6 +11,9 @@ import { Bar } from '../bars/entities/bar.entity';
 import { Distillery } from '../distilleries/entities/distillery.entity';
 import { Event } from '../events/entities/event.entity';
 import { Customer } from '../customers/entities/customer.entity';
+import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../stripe/entities/notification.entity';
 
 @Injectable()
 export class OrdersService {
@@ -25,7 +28,26 @@ export class OrdersService {
     private eventRepository: Repository<Event>,
     @InjectRepository(Customer)
     private customerRepository: Repository<Customer>,
+    private emailService: EmailService,
+    private notificationsService: NotificationsService,
   ) {}
+
+  /** Returns the listing the order is attached to plus its owner. */
+  private async getOrderListing(order: Order) {
+    if (order.orderType === OrderType.BAR_RESERVATION && order.barId) {
+      const bar = await this.barRepository.findOne({ where: { id: order.barId } });
+      return { listing: bar, name: bar?.name || 'Bar', ownerUserId: bar?.userId };
+    }
+    if (order.orderType === OrderType.DISTILLERY_TOUR && order.distilleryId) {
+      const d = await this.distilleryRepository.findOne({ where: { id: order.distilleryId } });
+      return { listing: d, name: d?.name || 'Distillery', ownerUserId: d?.userId };
+    }
+    if (order.orderType === OrderType.EVENT_BOOKING && order.eventId) {
+      const e = await this.eventRepository.findOne({ where: { id: order.eventId } });
+      return { listing: e, name: e?.name || 'Event', ownerUserId: e?.userId };
+    }
+    return { listing: null, name: 'your booking', ownerUserId: undefined };
+  }
 
   async create(createOrderDto: CreateOrderDto, customerId: number): Promise<Order> {
     // Validate customer exists and is active
@@ -74,7 +96,60 @@ export class OrdersService {
     customer.lastOrderDate = new Date();
     await this.customerRepository.save(customer);
 
+    // Fire the "we've received your booking" email + in-app notification.
+    // The Stripe webhook fires sendBookingConfirmation separately once the
+    // owner confirms via /orders/:id/status, so this is just the first
+    // touch confirming we got the request.
+    const { name: listingName, ownerUserId } = await this.getOrderListing(savedOrder);
+    this.emailService
+      .sendBookingReceivedToCustomer(
+        customer.email,
+        `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'there',
+        savedOrder.id,
+        listingName,
+        savedOrder.totalAmount as any,
+      )
+      .catch(() => undefined);
+    this.notificationsService
+      .create({
+        customerId: customer.id,
+        type: NotificationType.BOOKING_RECEIVED,
+        title: 'Booking received',
+        message: `Your booking for ${listingName} is pending confirmation. We'll email your ticket once it's confirmed.`,
+        metadata: { orderId: savedOrder.id },
+      })
+      .catch(() => undefined);
+    if (ownerUserId) {
+      this.notificationsService
+        .create({
+          userId: ownerUserId,
+          type: NotificationType.BOOKING_RECEIVED,
+          title: 'New booking received',
+          message: `${customer.firstName || ''} ${customer.lastName || ''}`.trim() + ` requested a booking. Confirm or cancel in Orders.`,
+          metadata: { orderId: savedOrder.id, customerId: customer.id },
+        })
+        .catch(() => undefined);
+    }
+
     return savedOrder;
+  }
+
+  /** Customer-scoped order listing. */
+  async findByCustomer(customerId: number): Promise<Order[]> {
+    return this.orderRepository.find({
+      where: { customerId },
+      relations: ['bar', 'distillery', 'event'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findOneForCustomer(id: number, customerId: number): Promise<Order> {
+    const order = await this.orderRepository.findOne({
+      where: { id, customerId },
+      relations: ['bar', 'distillery', 'event'],
+    });
+    if (!order) throw new NotFoundException('Booking not found');
+    return order;
   }
 
   async findAll(paginationDto: PaginationDto, userId?: number, userRole?: UserRole): Promise<{ data: Order[]; total: number }> {
@@ -139,13 +214,54 @@ export class OrdersService {
 
   async updateStatus(id: number, updateOrderDto: UpdateOrderStatusDto, userId?: number, userRole?: UserRole): Promise<Order> {
     const order = await this.findOne(id, userId, userRole);
-    
+    const previousStatus = order.status;
+
     order.status = updateOrderDto.status;
     if (updateOrderDto.notes) {
       order.specialRequests = updateOrderDto.notes;
     }
 
-    return this.orderRepository.save(order);
+    const saved = await this.orderRepository.save(order);
+
+    // Status changed → notify customer (in-app) and email the ticket on confirmation.
+    if (previousStatus !== saved.status) {
+      const { name: listingName } = await this.getOrderListing(saved);
+      if (saved.status === OrderStatus.CONFIRMED) {
+        this.emailService
+          .sendBookingTicket(
+            saved.customerEmail,
+            saved.customerName || 'there',
+            saved.id,
+            listingName,
+            saved.totalAmount as any,
+            saved.bookingDate ? saved.bookingDate.toString() : '',
+            saved.bookingTime || '',
+            saved.numberOfGuests || 1,
+          )
+          .catch(() => undefined);
+        this.notificationsService
+          .create({
+            customerId: saved.customerId,
+            type: NotificationType.BOOKING_CONFIRMED,
+            title: 'Booking confirmed',
+            message: `Your booking for ${listingName} is confirmed — your ticket is on its way to your inbox.`,
+            metadata: { orderId: saved.id },
+          })
+          .catch(() => undefined);
+      } else if (saved.status === OrderStatus.CANCELLED) {
+        this.notificationsService
+          .create({
+            customerId: saved.customerId,
+            type: NotificationType.GENERIC,
+            title: 'Booking cancelled',
+            message: `Your booking for ${listingName} was cancelled. If you've paid, a refund is on its way.`,
+            metadata: { orderId: saved.id },
+          })
+          .catch(() => undefined);
+      }
+    }
+
+    return saved;
   }
 
   async findByOwner(userId: number, userRole: UserRole): Promise<Order[]> {

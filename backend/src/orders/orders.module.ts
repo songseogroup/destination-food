@@ -8,10 +8,14 @@ import { Bar } from '../bars/entities/bar.entity';
 import { Distillery } from '../distilleries/entities/distillery.entity';
 import { Event } from '../events/entities/event.entity';
 import { Customer } from '../customers/entities/customer.entity';
+import { EmailModule } from '../email/email.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, Bar, Distillery, Event, Customer]),
+    EmailModule,
+    NotificationsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

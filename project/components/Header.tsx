@@ -92,7 +92,7 @@ export default function Header() {
                       <p className="text-gray-400 text-xs truncate">{customer.email}</p>
                     </div>
                     <Link
-                      href="/order"
+                      href="/orders"
                       className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
                       onClick={() => setIsUserDropdownOpen(false)}
                     >
@@ -174,7 +174,7 @@ export default function Header() {
                 {isAuthenticated && customer ? (
                   <>
                     <p className="text-gray-400 text-sm mb-3">Signed in as <span className="text-white">{customer.firstName}</span></p>
-                    <Link href="/order" className="block text-gray-300 hover:text-primary-500 transition-colors mb-3" onClick={() => setIsMenuOpen(false)}>
+                    <Link href="/orders" className="block text-gray-300 hover:text-primary-500 transition-colors mb-3" onClick={() => setIsMenuOpen(false)}>
                       My Orders
                     </Link>
                     <button

@@ -48,6 +48,7 @@ const superAdminNavigation = [
   { name: 'Media', href: '/dashboard/media', icon: Upload },
   { name: 'Customers', href: '/dashboard/customers', icon: Users },
   { name: 'Review Moderation', href: '/dashboard/admin/reviews', icon: Star },
+  { name: 'Platform Pricing', href: '/dashboard/admin/pricing', icon: DollarSign },
   { name: 'Payout Review', href: '/dashboard/admin/payouts', icon: ShieldCheck },
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },

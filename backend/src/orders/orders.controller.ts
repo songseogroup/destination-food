@@ -60,6 +60,23 @@ export class OrdersController {
     return this.ordersService.findByOwner(req.user.id, req.user.role);
   }
 
+  @Get('customer/mine')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all bookings for the logged-in customer' })
+  async findMyCustomerOrders(@Request() req) {
+    // Customer JWTs put the customer id in req.user.id (set by JwtStrategy).
+    return this.ordersService.findByCustomer(req.user.id);
+  }
+
+  @Get('customer/mine/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a single booking belonging to the logged-in customer' })
+  async findOneForCustomer(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.ordersService.findOneForCustomer(id, req.user.id);
+  }
+
   @Get('export/csv')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

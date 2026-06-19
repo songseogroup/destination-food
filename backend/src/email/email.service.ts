@@ -70,6 +70,50 @@ export class EmailService {
   }
 
   /**
+   * "We got your booking" — sent the moment a customer creates an order,
+   * before the owner has confirmed. Lets the customer know we have their
+   * request and a ticket will follow once confirmed.
+   */
+  async sendBookingReceivedToCustomer(
+    customerEmail: string,
+    customerName: string,
+    orderId: number,
+    listingName: string,
+    amount: number,
+  ): Promise<boolean> {
+    const subject = `We got your booking — ${listingName}`;
+    const html = this.getBookingReceivedCustomerTemplate(customerName, orderId, listingName, amount);
+    return this.sendEmail(customerEmail, subject, html);
+  }
+
+  /**
+   * Ticket-style email — sent when the owner confirms a booking.
+   * This is the email the customer shows at the door.
+   */
+  async sendBookingTicket(
+    customerEmail: string,
+    customerName: string,
+    orderId: number,
+    listingName: string,
+    amount: number,
+    bookingDate: string,
+    bookingTime: string,
+    guests: number,
+  ): Promise<boolean> {
+    const subject = `Your ticket — ${listingName}`;
+    const html = this.getBookingTicketTemplate(
+      customerName,
+      orderId,
+      listingName,
+      amount,
+      bookingDate,
+      bookingTime,
+      guests,
+    );
+    return this.sendEmail(customerEmail, subject, html);
+  }
+
+  /**
    * Send booking confirmation email to customer
    */
   async sendBookingConfirmation(
@@ -212,6 +256,143 @@ export class EmailService {
   /**
    * Email templates
    */
+  private getBookingReceivedCustomerTemplate(
+    name: string,
+    orderId: number,
+    listingName: string,
+    amount: number,
+  ): string {
+    const safeAmount = Number.isFinite(Number(amount)) ? Number(amount).toFixed(2) : '0.00';
+    return `
+      <!DOCTYPE html>
+      <html><head><meta charset="utf-8"><title>Booking received</title></head>
+      <body style="margin:0;padding:0;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;color:#f4f4f5;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:32px 16px;">
+          <tr><td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#111;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;">
+              <tr><td style="padding:32px;text-align:center;background:linear-gradient(135deg,#0a0a0a,#1a1a1a);border-bottom:2px solid #eab308;">
+                <h1 style="margin:0;font-size:24px;font-weight:700;color:#fff;">Destination <span style="color:#eab308;">Whisky</span></h1>
+              </td></tr>
+              <tr><td style="padding:32px;">
+                <p style="margin:0 0 6px;font-size:20px;color:#fff;">Hi ${name},</p>
+                <p style="margin:0 0 18px;font-size:15px;color:#a1a1aa;line-height:1.6;">
+                  We've got your booking request for <strong style="color:#fff;">${listingName}</strong>. The venue is reviewing it right now — once they confirm, we'll send you your ticket.
+                </p>
+                <div style="background:#0a0a0a;border:1px solid #1f1f1f;border-radius:8px;padding:16px;margin:20px 0;">
+                  <p style="margin:0;font-size:13px;color:#71717a;">BOOKING REFERENCE</p>
+                  <p style="margin:4px 0 12px;font-size:22px;font-weight:700;color:#eab308;letter-spacing:2px;">#${orderId.toString().padStart(6, '0')}</p>
+                  <p style="margin:0;font-size:13px;color:#71717a;">Amount</p>
+                  <p style="margin:4px 0 0;font-size:18px;font-weight:600;color:#fff;">$${safeAmount}</p>
+                </div>
+                <p style="margin:0;font-size:13px;color:#71717a;line-height:1.6;">
+                  Confirmation usually arrives within a few hours. If you don't hear back within 24 hours, reply to this email and we'll chase the venue for you.
+                </p>
+              </td></tr>
+              <tr><td style="padding:18px 32px;background:#0a0a0a;border-top:1px solid #1f1f1f;text-align:center;">
+                <p style="margin:0;font-size:12px;color:#52525b;">Booking ref #${orderId.toString().padStart(6, '0')} · Keep this email for your records</p>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body></html>
+    `;
+  }
+
+  private getBookingTicketTemplate(
+    name: string,
+    orderId: number,
+    listingName: string,
+    amount: number,
+    bookingDate: string,
+    bookingTime: string,
+    guests: number,
+  ): string {
+    const safeAmount = Number.isFinite(Number(amount)) ? Number(amount).toFixed(2) : '0.00';
+    const ref = `#${orderId.toString().padStart(6, '0')}`;
+    let dateStr = bookingDate;
+    try {
+      if (bookingDate) {
+        dateStr = new Date(bookingDate).toLocaleDateString(undefined, {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      }
+    } catch {
+      // keep raw
+    }
+    return `
+      <!DOCTYPE html>
+      <html><head><meta charset="utf-8"><title>Your ticket</title></head>
+      <body style="margin:0;padding:0;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;color:#f4f4f5;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:32px 16px;">
+          <tr><td align="center">
+            <!-- Ticket card -->
+            <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#111;border:1px solid #2a2a2a;border-radius:18px;overflow:hidden;box-shadow:0 24px 48px rgba(234,179,8,0.08);">
+              <!-- Top stripe -->
+              <tr><td style="height:8px;background:linear-gradient(90deg,#eab308,#facc15,#eab308);"></td></tr>
+              <!-- Header -->
+              <tr><td style="padding:28px 32px 18px;text-align:center;">
+                <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:3px;color:#eab308;text-transform:uppercase;">Booking confirmed</p>
+                <h1 style="margin:8px 0 0;font-size:26px;font-weight:700;color:#fff;letter-spacing:-0.5px;">
+                  Destination <span style="color:#eab308;">Whisky</span>
+                </h1>
+              </td></tr>
+              <!-- Greeting -->
+              <tr><td style="padding:0 32px 12px;">
+                <p style="margin:0;font-size:16px;color:#fff;">Hi ${name},</p>
+                <p style="margin:6px 0 0;font-size:14px;color:#a1a1aa;line-height:1.5;">
+                  Your booking is confirmed. Show this ticket at the venue.
+                </p>
+              </td></tr>
+              <!-- Ticket body -->
+              <tr><td style="padding:18px 32px 8px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:12px;">
+                  <tr><td style="padding:24px;text-align:center;border-bottom:1px dashed #2a2a2a;">
+                    <p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:2px;color:#71717a;text-transform:uppercase;">${listingName}</p>
+                    <p style="margin:0;font-size:32px;font-weight:800;color:#eab308;letter-spacing:4px;">${ref}</p>
+                  </td></tr>
+                  <tr><td style="padding:20px 24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:6px 8px 6px 0;vertical-align:top;width:50%;">
+                          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1.5px;color:#71717a;text-transform:uppercase;">Date</p>
+                          <p style="margin:4px 0 0;font-size:15px;color:#fff;font-weight:500;">${dateStr || '—'}</p>
+                        </td>
+                        <td style="padding:6px 0 6px 8px;vertical-align:top;width:50%;">
+                          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1.5px;color:#71717a;text-transform:uppercase;">Time</p>
+                          <p style="margin:4px 0 0;font-size:15px;color:#fff;font-weight:500;">${bookingTime || '—'}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:14px 8px 6px 0;vertical-align:top;width:50%;">
+                          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1.5px;color:#71717a;text-transform:uppercase;">Guests</p>
+                          <p style="margin:4px 0 0;font-size:15px;color:#fff;font-weight:500;">${guests}</p>
+                        </td>
+                        <td style="padding:14px 0 6px 8px;vertical-align:top;width:50%;">
+                          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1.5px;color:#71717a;text-transform:uppercase;">Total paid</p>
+                          <p style="margin:4px 0 0;font-size:15px;color:#fff;font-weight:500;">$${safeAmount}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td></tr>
+                </table>
+              </td></tr>
+              <!-- Footer note -->
+              <tr><td style="padding:18px 32px 24px;text-align:center;">
+                <p style="margin:0;font-size:12px;color:#52525b;line-height:1.5;">
+                  Bring this ticket on your phone or printed. Please arrive 10 minutes early.<br/>
+                  Reference: ${ref} · Need to cancel? Reply to this email.
+                </p>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </body></html>
+    `;
+  }
+
   private getPasswordResetTemplate(name: string, resetUrl: string, expiresInMinutes: number): string {
     return `
       <!DOCTYPE html>
