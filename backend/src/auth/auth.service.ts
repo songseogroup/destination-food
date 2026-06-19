@@ -7,7 +7,7 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'crypto';
 
 import { User, UserRole, VendorApprovalStatus } from '../users/entities/user.entity';
-import { LoginDto, CreateUserDto, RegisterDto, InviteAdminUserDto, SetPasswordFromInviteDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
+import { LoginDto, CreateUserDto, RegisterDto, InviteAdminUserDto, SetPasswordFromInviteDto, ForgotPasswordDto, ResetPasswordDto, UpdateMeDto, ChangePasswordDto } from './dto/auth.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../stripe/entities/notification.entity';
 import { Bar } from '../bars/entities/bar.entity';
@@ -295,6 +295,47 @@ export class AuthService {
 
   async findUserById(id: number) {
     return this.userRepository.findOne({ where: { id } });
+  }
+
+  /**
+   * Self-update for the logged-in admin / owner. Limited to safe fields —
+   * role / approvalStatus / isActive can only be changed by another admin.
+   */
+  async updateMe(userId: number, patch: UpdateMeDto) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    if (patch.email && patch.email !== user.email) {
+      const existing = await this.userRepository.findOne({ where: { email: patch.email } });
+      if (existing && existing.id !== userId) {
+        throw new ConflictException('That email is already in use.');
+      }
+      user.email = patch.email;
+    }
+    if (patch.firstName !== undefined) user.firstName = patch.firstName;
+    if (patch.lastName !== undefined) user.lastName = patch.lastName;
+
+    const saved = await this.userRepository.save(user);
+    const { password, ...safe } = saved;
+    return safe;
+  }
+
+  async changeMyPassword(userId: number, dto: ChangePasswordDto): Promise<{ ok: true }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const matches = await bcrypt.compare(dto.currentPassword, user.password);
+    if (!matches) {
+      throw new UnauthorizedException('Current password is incorrect.');
+    }
+    if (dto.newPassword.length < 6) {
+      throw new BadRequestException('New password must be at least 6 characters.');
+    }
+
+    user.password = await bcrypt.hash(dto.newPassword, 10);
+    user.passwordSetAt = new Date();
+    await this.userRepository.save(user);
+    return { ok: true };
   }
 
   async registerBusiness(body: any, files: any) {

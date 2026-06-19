@@ -59,6 +59,29 @@ export class ForgotPasswordDto {
   email: string;
 }
 
+export class UpdateMeDto {
+  @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+}
+
+export class ChangePasswordDto {
+  @IsString()
+  currentPassword: string;
+
+  @IsString()
+  @MinLength(6)
+  newPassword: string;
+}
+
 export class ResetPasswordDto {
   @IsString()
   token: string;

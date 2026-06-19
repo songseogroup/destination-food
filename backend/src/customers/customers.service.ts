@@ -231,6 +231,62 @@ export class CustomersService {
     return this.customerRepository.save(customer);
   }
 
+  /**
+   * Customer-self-update — limited to safe profile fields. The general
+   * update() above is called from admin routes and accepts the full
+   * UpdateCustomerDto; this one strips anything the customer shouldn't
+   * be able to touch (isActive, emailVerified, etc.).
+   */
+  async updateMe(
+    customerId: number,
+    patch: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string;
+    },
+  ): Promise<Customer> {
+    const customer = await this.findOne(customerId);
+
+    if (patch.email && patch.email !== customer.email) {
+      const existing = await this.findByEmail(patch.email);
+      if (existing && existing.id !== customerId) {
+        throw new ConflictException('That email is already in use.');
+      }
+      customer.email = patch.email;
+      // Email changed — make them re-verify next time we wire verification.
+      customer.emailVerified = false;
+    }
+    if (patch.firstName !== undefined) customer.firstName = patch.firstName;
+    if (patch.lastName !== undefined) customer.lastName = patch.lastName;
+    if (patch.phone !== undefined) customer.phone = patch.phone;
+
+    const saved = await this.customerRepository.save(customer);
+    const { password, ...safe } = saved;
+    return safe as Customer;
+  }
+
+  async changeMyPassword(
+    customerId: number,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ ok: true }> {
+    const customer = await this.customerRepository.findOne({ where: { id: customerId } });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const matches = await bcrypt.compare(currentPassword, customer.password);
+    if (!matches) {
+      throw new UnauthorizedException('Current password is incorrect.');
+    }
+    if (newPassword.length < 6) {
+      throw new ConflictException('New password must be at least 6 characters.');
+    }
+
+    customer.password = await bcrypt.hash(newPassword, 10);
+    await this.customerRepository.save(customer);
+    return { ok: true };
+  }
+
   async remove(id: number): Promise<void> {
     const customer = await this.findOne(id);
     await this.customerRepository.remove(customer);

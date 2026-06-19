@@ -1,9 +1,9 @@
-import { Controller, Post, Body, Get, UseGuards, Request, UseInterceptors, UploadedFiles, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Post, Body, Get, Patch, UseGuards, Request, UseInterceptors, UploadedFiles, UsePipes, ValidationPipe } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 
 import { AuthService } from './auth.service';
-import { LoginDto, CreateUserDto, RegisterDto, InviteAdminUserDto, SetPasswordFromInviteDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
+import { LoginDto, CreateUserDto, RegisterDto, InviteAdminUserDto, SetPasswordFromInviteDto, ForgotPasswordDto, ResetPasswordDto, UpdateMeDto, ChangePasswordDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
@@ -105,5 +105,32 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'User profile retrieved' })
   async getProfile(@Request() req) {
     return req.user;
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get the current admin / owner profile (full DB row, password stripped)' })
+  async getMe(@Request() req) {
+    const user = await this.authService.findUserById(req.user.id);
+    if (!user) return null;
+    const { password, ...safe } = user;
+    return safe;
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update the current admin / owner profile' })
+  async updateMe(@Body() dto: UpdateMeDto, @Request() req) {
+    return this.authService.updateMe(req.user.id, dto);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change the signed-in user\'s password (verifies current password)' })
+  async changeMyPassword(@Body() dto: ChangePasswordDto, @Request() req) {
+    return this.authService.changeMyPassword(req.user.id, dto);
   }
 }

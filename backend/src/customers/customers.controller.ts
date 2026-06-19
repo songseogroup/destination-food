@@ -16,6 +16,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { LoginCustomerDto } from './dto/login-customer.dto';
 import { CustomerForgotPasswordDto, CustomerResetPasswordDto } from './dto/forgot-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -40,6 +41,26 @@ export class CustomersController {
   @Post('forgot-password')
   forgotPassword(@Body() dto: CustomerForgotPasswordDto) {
     return this.customersService.forgotPassword(dto);
+  }
+
+  // Customer self-management — JWT identifies the caller, no id in path.
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  getMe(@Request() req) {
+    return this.customersService.findOne(req.user.id);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  updateMe(@Body() patch: Partial<UpdateCustomerDto>, @Request() req) {
+    return this.customersService.updateMe(req.user.id, patch as any);
+  }
+
+  @Post('me/change-password')
+  @UseGuards(JwtAuthGuard)
+  changeMyPassword(@Body() dto: ChangePasswordDto, @Request() req) {
+    return this.customersService.changeMyPassword(req.user.id, dto.currentPassword, dto.newPassword);
   }
 
   @Post('reset-password')

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Search, User, LogOut, Settings } from 'lucide-react'
+import { Search, User, LogOut, Settings, UserCircle } from 'lucide-react'
 import { auth, User as UserType } from '@/lib/auth'
 import toast from 'react-hot-toast'
 import { NotificationsBell } from './NotificationsBell'
@@ -66,6 +66,13 @@ export function Header({ user }: HeaderProps) {
                   exit={{ opacity: 0, y: -10 }}
                   className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
                 >
+                  <button
+                    onClick={() => router.push('/dashboard/profile')}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    <UserCircle className="h-4 w-4 mr-3" />
+                    My profile
+                  </button>
                   <button
                     onClick={() => router.push('/dashboard/settings')}
                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"

@@ -98,6 +98,13 @@ export default function Header() {
                     >
                       My Orders
                     </Link>
+                    <Link
+                      href="/account"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+                      onClick={() => setIsUserDropdownOpen(false)}
+                    >
+                      My Account
+                    </Link>
                     <button
                       onClick={() => { logout(); setIsUserDropdownOpen(false) }}
                       className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-gray-800 transition-colors"
@@ -176,6 +183,9 @@ export default function Header() {
                     <p className="text-gray-400 text-sm mb-3">Signed in as <span className="text-white">{customer.firstName}</span></p>
                     <Link href="/orders" className="block text-gray-300 hover:text-primary-500 transition-colors mb-3" onClick={() => setIsMenuOpen(false)}>
                       My Orders
+                    </Link>
+                    <Link href="/account" className="block text-gray-300 hover:text-primary-500 transition-colors mb-3" onClick={() => setIsMenuOpen(false)}>
+                      My Account
                     </Link>
                     <button
                       onClick={() => { logout(); setIsMenuOpen(false) }}
