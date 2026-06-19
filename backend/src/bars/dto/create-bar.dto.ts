@@ -1,4 +1,4 @@
-import { IsString, IsBoolean, IsArray, IsOptional, IsUrl, IsObject, IsInt, Min } from 'class-validator';
+import { IsString, IsBoolean, IsArray, IsOptional, IsUrl, IsObject, IsInt, IsNumber, Min } from 'class-validator';
 
 export class CreateBarDto {
   @IsString()
@@ -62,4 +62,9 @@ export class CreateBarDto {
   @IsInt()
   @Min(1)
   refundWindowHours?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  bookingDepositPerGuest?: number;
 }

@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Star, MapPin, Clock, Phone, Share2, Heart, X } from 'lucide-react'
+import { Star, MapPin, Clock, Phone, Share2, Heart, X, CreditCard } from 'lucide-react'
 import Header from '../../../components/Header'
 import Footer from '../../../components/Footer'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import ReviewsSection from '../../../components/ReviewsSection'
+import StripePayment from '../../../components/StripePayment'
 import { apiService } from '../../../lib/api'
 import { Bar } from '../../../lib/types'
 
@@ -100,6 +101,17 @@ export default function BarDetailPage() {
     { id: 'photos', label: 'Photos' }
   ]
 
+  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
+  const [showPayment, setShowPayment] = useState(false)
+
+  // If the bar set a per-guest deposit, charge it upfront. Otherwise the
+  // reservation is free to make and the customer pays at the venue.
+  const depositPerGuest = Number((bar as any)?.bookingDepositPerGuest || 0)
+  const requiresDeposit = depositPerGuest > 0
+  const depositTotal = requiresDeposit
+    ? Number((depositPerGuest * (bookingForm.numberOfGuests || 1)).toFixed(2))
+    : 0
+
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -113,19 +125,32 @@ export default function BarDetailPage() {
         customerEmail: bookingForm.customerEmail,
         customerPhone: bookingForm.customerPhone,
         numberOfGuests: bookingForm.numberOfGuests,
-        totalAmount: 0, // Bar reservations might not have upfront payment
+        totalAmount: depositTotal,
         bookingDate: bookingForm.bookingDate,
         bookingTime: bookingForm.bookingTime,
         specialRequests: bookingForm.specialRequests,
-        paymentMethod: 'on-site',
+        paymentMethod: requiresDeposit ? 'online' : 'on-site',
         isPaid: false,
       }
 
       const response = await apiService.createOrder(orderData)
-      router.push(`/orders/${response.data.id}`)
+      const newOrderId = response.data.id
+      setCreatedOrderId(newOrderId)
+      if (requiresDeposit) {
+        setShowPayment(true)
+        setIsSubmitting(false)
+      } else {
+        router.push(`/orders/${newOrderId}`)
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create reservation. Please try again.')
       setIsSubmitting(false)
+    }
+  }
+
+  const handlePaymentSuccess = () => {
+    if (createdOrderId) {
+      router.push(`/orders/${createdOrderId}`)
     }
   }
 
@@ -407,10 +432,48 @@ export default function BarDetailPage() {
               <X className="w-6 h-6" />
             </button>
 
-            <h2 className="text-2xl font-bold mb-4">Make Reservation</h2>
-            <p className="text-gray-400 mb-6">{barDetails.name}</p>
+            <h2 className="text-2xl font-bold mb-4">
+              {showPayment ? 'Confirm payment' : 'Make Reservation'}
+            </h2>
+            <p className="text-gray-400 mb-4">{barDetails.name}</p>
 
+            {showPayment && createdOrderId ? (
+              <div className="space-y-4">
+                <div className="bg-primary-500/10 border border-primary-500/40 rounded-lg p-4">
+                  <p className="text-sm text-primary-200 flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    Deposit: <strong className="text-white">${depositTotal.toFixed(2)}</strong> for {bookingForm.numberOfGuests}{' '}
+                    {bookingForm.numberOfGuests === 1 ? 'guest' : 'guests'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    This holds your table. It&apos;s refundable up to {(bar as any)?.refundWindowHours || 48} hours before your booking.
+                  </p>
+                </div>
+                <StripePayment
+                  orderId={createdOrderId}
+                  amount={depositTotal}
+                  onSuccess={handlePaymentSuccess}
+                  onError={(msg) => setError(msg)}
+                />
+                {error && (
+                  <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded text-sm">
+                    {error}
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 text-center">
+                  Your reservation is held. Payment is processed securely by Stripe.
+                </p>
+              </div>
+            ) : (
             <form onSubmit={handleBooking} className="space-y-4">
+              {requiresDeposit && (
+                <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-lg p-3 flex items-start gap-2">
+                  <CreditCard className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-yellow-200 leading-relaxed">
+                    This venue requires a <strong>${depositPerGuest.toFixed(2)} per guest deposit</strong> to hold your table. You&apos;ll pay <strong>${depositTotal.toFixed(2)}</strong> after submitting the form.
+                  </div>
+                </div>
+              )}
               {error && (
                 <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded">
                   {error}
@@ -508,10 +571,11 @@ export default function BarDetailPage() {
                   disabled={isSubmitting}
                   className="flex-1 bg-primary-500 hover:bg-primary-600 text-black font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Processing...' : 'Confirm Reservation'}
+                  {isSubmitting ? 'Processing…' : requiresDeposit ? 'Continue to payment' : 'Confirm Reservation'}
                 </button>
               </div>
             </form>
+            )}
           </motion.div>
         </div>
       )}

@@ -57,6 +57,13 @@ export class Bar {
   @Column({ type: 'int', default: 48 })
   refundWindowHours: number;
 
+  // Optional per-guest reservation deposit charged at booking time. When null,
+  // customers can reserve a table without paying upfront. When set, the bar
+  // booking modal computes `bookingDepositPerGuest × guests` and charges via
+  // Stripe before creating the order.
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  bookingDepositPerGuest: number;
+
   @Column({ default: true })
   isActive: boolean;
 

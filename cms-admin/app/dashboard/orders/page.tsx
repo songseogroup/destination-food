@@ -85,7 +85,16 @@ export default function OrdersPage() {
     }
   }
 
-  const handleStatusUpdate = (id: number, newStatus: string) => {
+  const handleStatusUpdate = (id: number, newStatus: string, order?: Order) => {
+    // Paid orders that are about to be cancelled trigger an automatic refund.
+    // Make sure the owner is aware before they click.
+    if (newStatus === 'cancelled' && order?.isPaid) {
+      const ok = confirm(
+        `This booking has been paid for ($${Number(order.totalAmount).toFixed(2)}). ` +
+          'Cancelling it will automatically queue a full refund for SuperAdmin approval. Continue?',
+      )
+      if (!ok) return
+    }
     updateStatusMutation.mutate({ id, status: newStatus })
   }
 
@@ -276,6 +285,13 @@ export default function OrdersPage() {
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
                       {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                     </span>
+                    {order.isPaid && (
+                      <div className="mt-1">
+                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                          PAID
+                        </span>
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
@@ -288,7 +304,7 @@ export default function OrdersPage() {
                       </button>
                       {order.status === 'pending' && (
                         <button
-                          onClick={() => handleStatusUpdate(order.id, 'confirmed')}
+                          onClick={() => handleStatusUpdate(order.id, 'confirmed', order)}
                           className="text-green-600 hover:text-green-900"
                           title="Confirm"
                         >
@@ -297,7 +313,7 @@ export default function OrdersPage() {
                       )}
                       {order.status !== 'completed' && order.status !== 'cancelled' && (
                         <button
-                          onClick={() => handleStatusUpdate(order.id, 'completed')}
+                          onClick={() => handleStatusUpdate(order.id, 'completed', order)}
                           className="text-blue-600 hover:text-blue-900"
                           title="Complete"
                         >
@@ -306,9 +322,9 @@ export default function OrdersPage() {
                       )}
                       {order.status !== 'cancelled' && (
                         <button
-                          onClick={() => handleStatusUpdate(order.id, 'cancelled')}
-                          className="text-red-600 hover:text-red-900"
-                          title="Cancel"
+                          onClick={() => handleStatusUpdate(order.id, 'cancelled', order)}
+                          className={`hover:text-red-900 ${order.isPaid ? 'text-red-700' : 'text-red-600'}`}
+                          title={order.isPaid ? 'Cancel + refund' : 'Cancel'}
                         >
                           <XCircle className="h-5 w-5" />
                         </button>

@@ -30,6 +30,8 @@ interface BarFormData {
   website: string
   isOpen: boolean
   isActive: boolean
+  bookingDepositPerGuest?: number | null
+  refundWindowHours?: number | null
 }
 
 export function BarForm({ bar, onSuccess, onCancel }: BarFormProps) {
@@ -52,6 +54,8 @@ export function BarForm({ bar, onSuccess, onCancel }: BarFormProps) {
       website: bar?.website || '',
       isOpen: bar?.isOpen || true,
       isActive: bar?.isActive || true,
+      bookingDepositPerGuest: (bar as any)?.bookingDepositPerGuest ?? null,
+      refundWindowHours: (bar as any)?.refundWindowHours ?? 48,
     }
   })
   const isOpen = watch('isOpen')
@@ -175,6 +179,43 @@ export function BarForm({ bar, onSuccess, onCancel }: BarFormProps) {
               <option value="$$$$">$$$$ - Very Expensive</option>
             </select>
             {errors.priceRange && <p className="text-red-500 text-sm mt-1">{errors.priceRange.message}</p>}
+          </div>
+
+          <div>
+            <label className="label">Reservation deposit per guest</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+              <input
+                {...register('bookingDepositPerGuest', {
+                  setValueAs: (v) => (v === '' || v === null ? null : Number(v)),
+                })}
+                type="number"
+                step="0.5"
+                min="0"
+                className="input-field pl-7"
+                placeholder="0 = no deposit"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Leave blank or 0 for free reservations. If set, customers pay this amount × guests upfront via card.
+            </p>
+          </div>
+
+          <div>
+            <label className="label">Refund window (hours before booking)</label>
+            <input
+              {...register('refundWindowHours', {
+                setValueAs: (v) => (v === '' || v === null ? null : Number(v)),
+              })}
+              type="number"
+              step="1"
+              min="0"
+              className="input-field"
+              placeholder="48"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Customers can self-refund up until this many hours before their booking. Owner-initiated cancellations always refund automatically.
+            </p>
           </div>
         </div>
 
