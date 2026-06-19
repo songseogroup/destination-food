@@ -6,11 +6,13 @@ import { Customer } from './entities/customer.entity';
 import { CustomersService } from './customers.service';
 import { CustomersController } from './customers.controller';
 import { EmailModule } from '../email/email.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Customer]),
     EmailModule,
+    NotificationsModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({

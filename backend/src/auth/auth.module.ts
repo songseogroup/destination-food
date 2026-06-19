@@ -15,6 +15,7 @@ import { Event } from '../events/entities/event.entity';
 import { UploadModule } from '../upload/upload.module';
 import { EmailModule } from '../email/email.module';
 import { StripeModule } from '../stripe/stripe.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { StripeModule } from '../stripe/stripe.module';
     UploadModule,
     EmailModule,
     StripeModule,
+    NotificationsModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({

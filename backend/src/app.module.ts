@@ -22,6 +22,7 @@ import { StripeModule } from './stripe/stripe.module';
 import { EmailModule } from './email/email.module';
 import { AdminModule } from './admin/admin.module';
 import { BannersModule } from './banners/banners.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 // Entities
 import { User } from './users/entities/user.entity';
@@ -92,6 +93,7 @@ import { Banner } from './banners/entities/banner.entity';
     CustomersModule,
     AdminModule,
     BannersModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

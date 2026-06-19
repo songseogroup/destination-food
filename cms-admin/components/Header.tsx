@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Bell, Search, User, LogOut, Settings } from 'lucide-react'
+import { Search, User, LogOut, Settings } from 'lucide-react'
 import { auth, User as UserType } from '@/lib/auth'
 import toast from 'react-hot-toast'
+import { NotificationsBell } from './NotificationsBell'
 
 interface HeaderProps {
   user: UserType
@@ -39,11 +40,7 @@ export function Header({ user }: HeaderProps) {
 
           {/* Right side */}
           <div className="flex items-center space-x-3">
-            {/* Notifications */}
-            <button className="p-2 text-gray-400 hover:text-gray-600 relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-            </button>
+            <NotificationsBell />
 
             {/* User menu */}
             <div className="relative">

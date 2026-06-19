@@ -11,6 +11,8 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { LoginCustomerDto } from './dto/login-customer.dto';
 import { CustomerForgotPasswordDto, CustomerResetPasswordDto } from './dto/forgot-password.dto';
 import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../stripe/entities/notification.entity';
 
 @Injectable()
 export class CustomersService {
@@ -22,6 +24,7 @@ export class CustomersService {
     private jwtService: JwtService,
     private emailService: EmailService,
     private configService: ConfigService,
+    private notificationsService: NotificationsService,
   ) {}
 
   private hashResetToken(token: string): string {
@@ -95,6 +98,16 @@ export class CustomersService {
     const displayName = `${savedCustomer.firstName || ''} ${savedCustomer.lastName || ''}`.trim() || 'there';
     this.emailService
       .sendWelcomeEmail(savedCustomer.email, displayName, 'customer')
+      .catch(() => undefined);
+
+    // In-app welcome notification for the new customer.
+    this.notificationsService
+      .create({
+        customerId: savedCustomer.id,
+        type: NotificationType.WELCOME,
+        title: 'Welcome to Destination Whisky',
+        message: 'Your account is ready. Browse whisky bars, distillery tours, tastings, and events.',
+      })
       .catch(() => undefined);
 
     // Generate JWT token

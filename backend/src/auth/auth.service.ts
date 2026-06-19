@@ -8,6 +8,8 @@ import { randomBytes, createHash } from 'crypto';
 
 import { User, UserRole, VendorApprovalStatus } from '../users/entities/user.entity';
 import { LoginDto, CreateUserDto, RegisterDto, InviteAdminUserDto, SetPasswordFromInviteDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../stripe/entities/notification.entity';
 import { Bar } from '../bars/entities/bar.entity';
 import { Distillery } from '../distilleries/entities/distillery.entity';
 import { Event } from '../events/entities/event.entity';
@@ -33,6 +35,7 @@ export class AuthService {
     private emailService: EmailService,
     private configService: ConfigService,
     private stripeService: StripeService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -252,9 +255,42 @@ export class AuthService {
       .sendWelcomeEmail(savedUser.email, displayName, 'owner')
       .catch((err) => this.logger.warn(`Welcome email failed for ${savedUser.email}: ${err.message}`));
 
+    // In-app welcome notification for the new owner.
+    this.notificationsService
+      .create({
+        userId: savedUser.id,
+        type: NotificationType.WELCOME,
+        title: 'Welcome to Destination Whisky',
+        message:
+          'Your business owner account is ready. Head to Finance to upload your ID and connect your bank for payouts.',
+      })
+      .catch(() => undefined);
+
+    // Alert every SuperAdmin about the new vendor signup.
+    await this.notifySuperAdminsOfVendor(savedUser).catch(() => undefined);
+
     // Return user without password
     const { password, ...result } = savedUser;
     return result;
+  }
+
+  private async notifySuperAdminsOfVendor(vendor: User): Promise<void> {
+    const superAdmins = await this.userRepository.find({
+      where: { role: UserRole.SUPER_ADMIN },
+    });
+    if (superAdmins.length === 0) return;
+    const displayName = `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || vendor.email;
+    await Promise.all(
+      superAdmins.map((sa) =>
+        this.notificationsService.create({
+          userId: sa.id,
+          type: NotificationType.VENDOR_REGISTERED,
+          title: 'New vendor registered',
+          message: `${displayName} (${vendor.role}) signed up and is waiting for approval.`,
+          metadata: { vendorId: vendor.id, vendorEmail: vendor.email, vendorRole: vendor.role },
+        }),
+      ),
+    );
   }
 
   async findUserById(id: number) {

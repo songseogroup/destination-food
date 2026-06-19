@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Search, User, Menu, X, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 import { useCustomerAuth } from '../contexts/CustomerAuthContext'
+import NotificationsBell from './NotificationsBell'
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -66,6 +67,9 @@ export default function Header() {
 
           {/* Right side actions */}
           <div className="flex items-center space-x-3">
+            {/* Notifications bell — only renders when authenticated */}
+            <NotificationsBell />
+
             {/* Auth Buttons or User Dropdown */}
             {isAuthenticated && customer ? (
               /* Logged in - show user dropdown */

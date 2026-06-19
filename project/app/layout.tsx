@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import PageTransition from '../components/PageTransition'
+import CookieConsent from '../components/CookieConsent'
 import { CartProvider } from '../contexts/CartContext'
 import { CustomerAuthProvider } from '../contexts/CustomerAuthContext'
 
@@ -29,6 +30,7 @@ export default function RootLayout({
                 {children}
               </div>
             </PageTransition>
+            <CookieConsent />
           </CartProvider>
         </CustomerAuthProvider>
       </body>
