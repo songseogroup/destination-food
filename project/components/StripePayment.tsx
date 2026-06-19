@@ -1,11 +1,28 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js'
+import { loadStripe, Stripe, StripeElementsOptions } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { api } from '@/lib/api'
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
+// Lazy + cached. Calling loadStripe('') at module import time throws an
+// uncaught IntegrationError on every page that imports this component,
+// even ones where the customer never opens the payment modal. Defer the
+// call until <StripePayment /> actually renders so missing-env pages stay
+// usable.
+let stripePromise: Promise<Stripe | null> | null = null
+function getStripe(): Promise<Stripe | null> {
+  if (stripePromise) return stripePromise
+  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  if (!key) {
+    // Don't ask Stripe.js to throw. Resolve to null and let the component
+    // render a clear "payments are temporarily unavailable" message.
+    stripePromise = Promise.resolve(null)
+  } else {
+    stripePromise = loadStripe(key)
+  }
+  return stripePromise
+}
 
 interface StripePaymentProps {
   orderId: number
@@ -107,6 +124,18 @@ function PaymentForm({ orderId, amount, onSuccess, onError }: StripePaymentProps
 }
 
 export default function StripePayment({ orderId, amount, onSuccess, onError }: StripePaymentProps) {
+  const hasKey = !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+
+  if (!hasKey) {
+    // Friendlier UI than the raw Stripe IntegrationError. Means the
+    // operator forgot to set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on Vercel.
+    return (
+      <div className="bg-yellow-900/30 border border-yellow-700 text-yellow-200 px-4 py-3 rounded-lg text-sm">
+        Online payments are temporarily unavailable. Please contact us to complete your booking, or try again later.
+      </div>
+    )
+  }
+
   const options: StripeElementsOptions = {
     appearance: {
       theme: 'night',
@@ -123,7 +152,7 @@ export default function StripePayment({ orderId, amount, onSuccess, onError }: S
   }
 
   return (
-    <Elements stripe={stripePromise} options={options}>
+    <Elements stripe={getStripe()} options={options}>
       <PaymentForm orderId={orderId} amount={amount} onSuccess={onSuccess} onError={onError} />
     </Elements>
   )

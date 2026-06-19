@@ -34,6 +34,8 @@ export default function BarDetailPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
+  const [showPayment, setShowPayment] = useState(false)
 
   useEffect(() => {
     const fetchBar = async () => {
@@ -100,9 +102,6 @@ export default function BarDetailPage() {
     { id: 'reviews', label: 'Reviews' },
     { id: 'photos', label: 'Photos' }
   ]
-
-  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
-  const [showPayment, setShowPayment] = useState(false)
 
   // If the bar set a per-guest deposit, charge it upfront. Otherwise the
   // reservation is free to make and the customer pays at the venue.
