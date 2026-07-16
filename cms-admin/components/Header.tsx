@@ -24,7 +24,9 @@ export function Header({ user }: HeaderProps) {
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
-      <div className="px-4 sm:px-6 lg:px-8">
+      {/* Below lg the sidebar's menu button floats over this bar (fixed, left-4),
+          so the row has to start clear of it or it lands on top of the search. */}
+      <div className="pl-16 pr-4 sm:pr-6 lg:px-8">
         <div className="flex justify-between items-center h-12">
           {/* Search */}
           <div className="flex-1 max-w-md">

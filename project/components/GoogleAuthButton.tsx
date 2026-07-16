@@ -71,6 +71,27 @@ export default function GoogleAuthButton({
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return
     let cancelled = false
+    let stopObserving: (() => void) | undefined
+
+    /**
+     * GIS takes `width` only as a pixel number — no percentages — and caps it at
+     * 400, so the button cannot be made fluid with CSS: Google sets an inline
+     * width on its own iframe, which `w-full` on the wrapper can't override.
+     * Measure the slot we were handed instead, and re-measure when it changes.
+     */
+    const renderInto = (el: HTMLDivElement) => {
+      const width = Math.round(el.getBoundingClientRect().width)
+      if (!width) return
+      window.google!.accounts.id.renderButton(el, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        text: mode === 'signup' ? 'signup_with' : 'signin_with',
+        shape: 'pill',
+        logo_alignment: 'center',
+        width: Math.min(400, Math.max(200, width)),
+      })
+    }
 
     loadGsi()
       .then(() => {
@@ -95,16 +116,21 @@ export default function GoogleAuthButton({
           },
         })
 
-        window.google.accounts.id.renderButton(containerRef.current, {
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          text: mode === 'signup' ? 'signup_with' : 'signin_with',
-          shape: 'pill',
-          logo_alignment: 'center',
-          width: 360,
-        })
+        const el = containerRef.current
+        renderInto(el)
         setReady(true)
+
+        // Rotating a phone or resizing changes the slot; re-render at the new
+        // width. The 2px guard keeps a re-render from feeding itself.
+        let lastWidth = Math.round(el.getBoundingClientRect().width)
+        const observer = new ResizeObserver(() => {
+          const width = Math.round(el.getBoundingClientRect().width)
+          if (Math.abs(width - lastWidth) < 2) return
+          lastWidth = width
+          renderInto(el)
+        })
+        observer.observe(el)
+        stopObserving = () => observer.disconnect()
       })
       .catch(() => {
         if (!cancelled) onError?.('Could not reach Google. Check your connection and try again.')
@@ -112,6 +138,7 @@ export default function GoogleAuthButton({
 
     return () => {
       cancelled = true
+      stopObserving?.()
     }
     // loginWithGoogle/onError are stable enough in practice; re-running would
     // re-render the Google button and lose its iframe.
