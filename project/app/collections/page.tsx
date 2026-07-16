@@ -1,49 +1,115 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { Suspense, useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { SearchX, X } from 'lucide-react'
 import Header from '../../components/Header'
 import Footer from '../../components/Footer'
+import SitePromoBand from '../../components/SitePromoBand'
+import ListingCard, { ListingCardSkeleton } from '../../components/ListingCard'
+import type { ListingCardProps } from '../../components/ListingCard'
+import { EmptyState } from '../../components/ui/Section'
 import { apiService } from '@/lib/api'
 import { Bar, Distillery, Event } from '@/lib/types'
-import LoadingSpinner from '../../components/LoadingSpinner'
+import { formatEventDate, formatEventTime, formatPrice } from '@/lib/format'
 
-// Fallback collections from featured items
-const fallbackCollections = [
-  {
-    id: 1,
-    name: 'Featured Bars',
-    description: 'Discover the finest bars and lounges with premium experiences',
-    image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=600&h=400&fit=crop',
-    itemCount: 0,
-    discount: 'New',
-    featured: true
-  },
-  {
-    id: 2,
-    name: 'Premium Distilleries',
-    description: 'Explore craft spirit producers and their exceptional offerings',
-    image: 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=600&h=400&fit=crop',
-    itemCount: 0,
-    discount: null,
-    featured: false
-  },
-  {
-    id: 3,
-    name: 'Exclusive Events',
-    description: 'Join premium tastings, masterclasses, and social gatherings',
-    image: 'https://images.unsplash.com/photo-1571613316887-6f8d5cbf7ef7?w=600&h=400&fit=crop',
-    itemCount: 0,
-    discount: null,
-    featured: false
-  },
-]
+/**
+ * `rating` is decimal(3,2) in Postgres and arrives as a string ("4.50") — it is
+ * passed straight through to ListingCard, which coerces and formats it. There is
+ * deliberately no fallback value: a venue with no rating renders "New" rather
+ * than the invented "4.5" this page used to print on every card.
+ */
+function toBarCard(bar: Bar): ListingCardProps {
+  return {
+    href: `/bars/${bar.id}`,
+    image: bar.image,
+    title: bar.name,
+    rating: bar.rating,
+    reviews: bar.reviews,
+    meta: [bar.location, bar.type],
+    tags: (bar.specialties || []).slice(0, 2).map((label) => ({ label })),
+    status: bar.isOpen ? 'open' : 'closed',
+  }
+}
 
-export default function CollectionsPage() {
+function toDistilleryCard(distillery: Distillery): ListingCardProps {
+  return {
+    href: `/distilleries/${distillery.id}`,
+    image: distillery.image,
+    title: distillery.name,
+    rating: distillery.rating,
+    reviews: distillery.reviews,
+    meta: [distillery.location, distillery.type],
+    tags: (distillery.specialties || []).slice(0, 2).map((label) => ({ label })),
+    status: distillery.isOpen ? 'open' : 'closed',
+  }
+}
+
+/**
+ * Note the absent `rating` key. Event has no rating column, so omitting the prop
+ * makes ListingCard skip the stars row entirely; passing `null` would wrongly
+ * advertise the event as "New" (an unrated-but-ratable listing).
+ */
+function toEventCard(event: Event): ListingCardProps {
+  return {
+    href: `/events/${event.id}`,
+    image: event.image,
+    title: event.name,
+    meta: [event.location, formatEventDate(event.date), formatEventTime(event.time)],
+    tags: event.category ? [{ label: event.category }] : [],
+    pricePrefix: 'From',
+    price: formatPrice(event.price),
+    badge: event.isFeatured ? { label: 'Featured' } : null,
+  }
+}
+
+/** Case-insensitive substring match across a listing's searchable text. */
+function matches(query: string, ...fields: (string | null | undefined)[]) {
+  const q = query.toLowerCase()
+  return fields.some((field) => (field || '').toLowerCase().includes(q))
+}
+
+function BrowseHero() {
+  return (
+    <section className="border-b border-charcoal-200 bg-white py-16">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <h1 className="section-title text-4xl md:text-5xl">Collections</h1>
+          <p className="section-subtitle mt-4">
+            Discover curated collections of bars, distilleries, and exclusive events
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function SkeletonGrid({ count = 8 }: { count?: number }) {
+  return (
+    <section className="py-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: count }).map((_, i) => (
+            <ListingCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function CollectionsContent() {
   const [bars, setBars] = useState<Bar[]>([])
   const [distilleries, setDistilleries] = useState<Distillery[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+
+  // The header search box and the homepage hero both submit to /collections?q=…,
+  // which makes this page the search results surface. With no `q` it is the
+  // browse page it has always been.
+  const searchParams = useSearchParams()
+  const query = (searchParams.get('q') ?? '').trim()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -99,262 +165,286 @@ export default function CollectionsPage() {
     },
   ]
 
-  const featuredItems = [...bars.slice(0, 2), ...distilleries.slice(0, 2)].map((item: any) => ({
-    id: item.id,
-    name: item.name,
-    type: item.type || 'Experience',
-    image: item.image,
-    location: item.location,
-    rating: item.rating,
-    link: item.specialties ? `/distilleries/${item.id}` : `/bars/${item.id}`,
-  }))
+  const results: ListingCardProps[] = query
+    ? [
+        ...bars.filter((b) => matches(query, b.name, b.location, b.type)).map(toBarCard),
+        ...distilleries
+          .filter((d) => matches(query, d.name, d.location, d.type))
+          .map(toDistilleryCard),
+        ...events
+          .filter((e) => matches(query, e.name, e.location, e.type, e.category))
+          .map(toEventCard),
+      ]
+    : []
 
-  if (loading) {
+  // The old featured-venue mapping keyed off `item.specialties` to choose the
+  // link — but Bar carries `specialties` too, so every bar linked to
+  // /distilleries/:id. Mapping each type explicitly removes the guess.
+  const featuredVenues: ListingCardProps[] = [
+    ...bars.slice(0, 2).map(toBarCard),
+    ...distilleries.slice(0, 2).map(toDistilleryCard),
+  ]
+
+  /* ---------------- Search results ---------------- */
+  if (query) {
     return (
-      <div className="min-h-screen">
-        <Header />
-        <main className="bg-gray-50">
-          <section className="bg-gradient-to-r from-primary-500 to-primary-600 text-white py-16">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="text-center">
-                <h1 className="text-4xl md:text-5xl font-bold mb-4">
-                  Collections
-                </h1>
-                <p className="text-xl text-primary-100 max-w-2xl mx-auto">
-                  Discover curated collections of bars, distilleries, and exclusive events
+      <main className="bg-cream">
+        <section className="border-b border-charcoal-200 bg-white py-12">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <h1 className="section-title">
+              Results for <span className="text-whisky-600">&ldquo;{query}&rdquo;</span>
+            </h1>
+            <div className="mt-4 flex flex-wrap items-center gap-4">
+              {!loading && (
+                <p className="text-charcoal-600">
+                  {results.length} {results.length === 1 ? 'result' : 'results'} across bars,
+                  distilleries and events
                 </p>
+              )}
+              <Link
+                href="/collections"
+                className="inline-flex items-center gap-1.5 rounded-full border border-charcoal-200 bg-white px-3 py-1.5 text-sm font-medium text-charcoal-600 transition-colors hover:border-charcoal-300 hover:text-ink"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear search
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {loading ? (
+          <SkeletonGrid />
+        ) : (
+          <section className="py-12">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              {results.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  {results.map((card) => (
+                    <ListingCard key={card.href} {...card} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={<SearchX className="mx-auto h-10 w-10" strokeWidth={1.5} />}
+                  title={`No matches for "${query}"`}
+                  description="Try a different name, city or venue type — or browse the full collections below."
+                />
+              )}
+            </div>
+          </section>
+        )}
+
+        {!loading && results.length === 0 && (
+          <section className="pb-16">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <div className="flex flex-wrap justify-center gap-4">
+                {collections.map((collection) => (
+                  <Link key={collection.id} href={collection.link} className="btn-secondary">
+                    Browse {collection.name}
+                  </Link>
+                ))}
               </div>
             </div>
           </section>
-          <div className="flex justify-center py-20">
-            <LoadingSpinner size="lg" />
-          </div>
-        </main>
-        <Footer />
-      </div>
+        )}
+      </main>
+    )
+  }
+
+  /* ---------------- Browse ---------------- */
+  if (loading) {
+    return (
+      <main className="bg-cream">
+        <BrowseHero />
+        <SkeletonGrid />
+      </main>
     )
   }
 
   return (
-    <div className="min-h-screen">
-      <Header />
-      <main className="bg-gray-50">
-        {/* Hero Section */}
-        <section className="bg-gradient-to-r from-primary-500 to-primary-600 text-white py-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <h1 className="text-4xl md:text-5xl font-bold mb-4">
-                Collections
-              </h1>
-              <p className="text-xl text-primary-100 max-w-2xl mx-auto">
-                Discover curated collections of bars, distilleries, and exclusive events
-              </p>
-            </div>
-          </div>
-        </section>
+    <main className="bg-cream">
+      <BrowseHero />
 
-        {/* Featured Collection */}
-        <section className="py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              <div className="relative h-64 md:h-96">
-                <img 
-                  src={collections[0].image} 
-                  alt={collections[0].name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent"></div>
-                <div className="absolute inset-0 flex items-center">
-                  <div className="max-w-2xl mx-auto px-6 text-white">
-                    <div className="mb-4">
-                      <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                        {collections[0].discount || 'Featured'}
-                      </span>
-                    </div>
-                    <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                      {collections[0].name}
-                    </h2>
-                    <p className="text-lg text-gray-200 mb-6">
-                      {collections[0].description}
-                    </p>
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm text-gray-300">
-                        {collections[0].itemCount} venues available
-                      </span>
-                      <Link href={collections[0].link} className="btn-primary inline-block">
-                        Explore Collection
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+      {/* Site-wide promo — same campaign on every page. */}
+      <SitePromoBand className="py-12" />
 
-        {/* All Collections */}
-        <section className="py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-                Explore Collections
-              </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Browse through our carefully curated collections to find the perfect experience
-              </p>
-            </div>
-
-            {/* Collections Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {collections.filter(c => !c.featured).map((collection) => (
-                <Link 
-                  key={collection.id} 
-                  href={collection.link}
-                  className="group cursor-pointer block"
-                >
-                  <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-                    <div className="relative h-48">
-                      <div 
-                        className="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-300"
-                        style={{ backgroundImage: `url(${collection.image})` }}
-                      />
-                      {collection.discount && (
-                        <div className="absolute top-4 left-4">
-                          <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                            {collection.discount}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="p-6">
-                      <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-primary-600 transition-colors">
-                        {collection.name}
-                      </h3>
-                      <p className="text-gray-600 mb-4">
-                        {collection.description}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-500">
-                          {collection.itemCount} venues
-                        </span>
-                        <span className="text-primary-600 font-semibold">
-                          Explore →
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Featured Items */}
-        <section className="py-16 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Featured Venues
-              </h2>
-              <p className="text-lg text-gray-600">
-                Handpicked bars and distilleries from our collection
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredItems.map((item) => (
-                <Link 
-                  key={item.id} 
-                  href={item.link}
-                  className="group cursor-pointer block"
-                >
-                  <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-                    <div className="relative h-48">
-                      <div 
-                        className="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-300"
-                        style={{ backgroundImage: `url(${item.image})` }}
-                      />
-                      <div className="absolute top-4 right-4">
-                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-2">
-                          <span className="text-yellow-500 text-sm font-bold">★</span>
-                          <span className="text-gray-900 text-sm font-semibold ml-1">
-                            {item.rating || '4.5'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors">
-                        {item.name}
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-3">
-                        {item.location}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-primary-600 font-semibold">
-                          {item.type}
-                        </span>
-                        <span className="text-primary-600 font-semibold">
-                          View →
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Special Offers */}
-        <section className="py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-gradient-to-r from-accent-500 to-purple-600 rounded-2xl p-8 md:p-12 text-white">
-              <div className="text-center">
-                <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                  Exclusive Experiences
-                </h2>
-                <p className="text-lg text-accent-100 mb-8 max-w-2xl mx-auto">
-                  Don't miss out on these premium events and tastings. Book now and create unforgettable memories!
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link href="/events" className="bg-white text-accent-600 font-semibold py-3 px-8 rounded-lg hover:bg-gray-100 transition-colors text-center">
-                    View All Events
-                  </Link>
-                  <Link href="/bars" className="border-2 border-white text-white font-semibold py-3 px-8 rounded-lg hover:bg-white hover:text-accent-600 transition-colors text-center">
-                    Explore Bars
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Newsletter */}
-        <section className="py-12 bg-white">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Stay Updated
-            </h2>
-            <p className="text-lg text-gray-600 mb-8">
-              Subscribe to our newsletter for exclusive events and new venue updates
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+      {/* Featured Collection */}
+      <section className="py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="card overflow-hidden">
+            <div className="relative h-64 md:h-96">
+              <img
+                src={collections[0].image}
+                alt=""
+                className="h-full w-full object-cover"
               />
-              <button className="btn-primary whitespace-nowrap">
-                Subscribe
-              </button>
+              {/* A scrim on photography, not a dark theme — the type sits on the image. */}
+              <div className="absolute inset-0 bg-gradient-to-r from-charcoal-950/85 via-charcoal-950/50 to-transparent" />
+              <div className="absolute inset-0 flex items-center">
+                <div className="mx-auto max-w-2xl px-6 text-white">
+                  <span className="inline-flex items-center rounded-full bg-whisky-500 px-3 py-1 text-sm font-semibold text-white shadow-soft">
+                    {collections[0].discount || 'Featured'}
+                  </span>
+                  <h2 className="mt-4 font-display text-3xl font-bold md:text-4xl">
+                    {collections[0].name}
+                  </h2>
+                  <p className="mt-4 text-lg text-charcoal-100">{collections[0].description}</p>
+                  <div className="mt-6 flex flex-wrap items-center gap-4">
+                    <span className="text-sm text-charcoal-200">
+                      {collections[0].itemCount} venues available
+                    </span>
+                    <Link href={collections[0].link} className="btn-primary">
+                      Explore Collection
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </section>
-      </main>
+        </div>
+      </section>
+
+      {/* All Collections */}
+      <section className="py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-10 text-center">
+            <h2 className="section-title">Explore Collections</h2>
+            <p className="section-subtitle mt-3">
+              Browse through our carefully curated collections to find the perfect experience
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+            {collections.filter(c => !c.featured).map((collection) => (
+              <Link key={collection.id} href={collection.link} className="group block">
+                <article className="card-interactive h-full overflow-hidden">
+                  <div className="relative h-48 overflow-hidden bg-charcoal-100">
+                    <img
+                      src={collection.image}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                    />
+                    {collection.discount && (
+                      <span className="absolute left-3 top-3 rounded-full bg-whisky-500 px-3 py-1 text-xs font-semibold text-white shadow-soft">
+                        {collection.discount}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="p-6">
+                    <h3 className="font-display text-xl font-bold text-ink transition-colors group-hover:text-whisky-700">
+                      {collection.name}
+                    </h3>
+                    <p className="mt-2 text-charcoal-600">{collection.description}</p>
+                    <div className="mt-4 flex items-center justify-between">
+                      <span className="text-sm text-charcoal-500">
+                        {collection.itemCount} venues
+                      </span>
+                      <span className="text-sm font-semibold text-whisky-700">Explore →</span>
+                    </div>
+                  </div>
+                </article>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Items */}
+      <section className="border-y border-charcoal-200 bg-white py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-10 text-center">
+            <h2 className="section-title">Featured Venues</h2>
+            <p className="section-subtitle mt-3">
+              Handpicked bars and distilleries from our collection
+            </p>
+          </div>
+
+          {featuredVenues.length > 0 ? (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+              {featuredVenues.map((card) => (
+                <ListingCard key={card.href} {...card} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="No venues yet"
+              description="Bars and distilleries will appear here as they join the platform."
+            />
+          )}
+        </div>
+      </section>
+
+      {/* Special Offers */}
+      <section className="py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="gradient-bg rounded-3xl p-8 text-white md:p-12">
+            <div className="text-center">
+              <h2 className="font-display text-3xl font-bold md:text-4xl">
+                Exclusive Experiences
+              </h2>
+              <p className="mx-auto mt-4 max-w-2xl text-lg text-whisky-50">
+                Don&apos;t miss out on these premium events and tastings. Book now and create
+                unforgettable memories!
+              </p>
+              <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
+                <Link
+                  href="/events"
+                  className="inline-flex items-center justify-center rounded-full bg-white px-8 py-3 font-semibold text-whisky-700 transition-colors hover:bg-whisky-50"
+                >
+                  View All Events
+                </Link>
+                <Link
+                  href="/bars"
+                  className="inline-flex items-center justify-center rounded-full border-2 border-white px-8 py-3 font-semibold text-white transition-colors hover:bg-white hover:text-whisky-700"
+                >
+                  Explore Bars
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Newsletter */}
+      <section className="border-t border-charcoal-200 bg-white py-12">
+        <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="section-title">Stay Updated</h2>
+          <p className="mt-4 text-lg text-charcoal-600">
+            Subscribe to our newsletter for exclusive events and new venue updates
+          </p>
+          <div className="mx-auto mt-8 flex max-w-md flex-col gap-4 sm:flex-row">
+            <input
+              type="email"
+              placeholder="Enter your email"
+              aria-label="Email address"
+              className="input-field flex-1 rounded-full"
+            />
+            <button className="btn-primary whitespace-nowrap">Subscribe</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+export default function CollectionsPage() {
+  return (
+    <div className="min-h-screen bg-cream">
+      <Header />
+      {/* useSearchParams() opts the tree into client-side bailout; without a
+          Suspense boundary Next 14 fails the production build for this route. */}
+      <Suspense
+        fallback={
+          <main className="bg-cream">
+            <BrowseHero />
+            <SkeletonGrid />
+          </main>
+        }
+      >
+        <CollectionsContent />
+      </Suspense>
       <Footer />
     </div>
   )
-} 
+}

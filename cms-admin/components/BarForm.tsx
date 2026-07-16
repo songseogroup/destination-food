@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { useMutation, useQueryClient } from 'react-query'
 import { motion } from 'framer-motion'
 import { X, Plus, Save } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Bar } from '@/lib/types'
+import { SocialLinksField, SocialLink, cleanSocialLinks } from '@/components/SocialLinksField'
 import toast from 'react-hot-toast'
 
 interface BarFormProps {
@@ -28,11 +29,19 @@ interface BarFormData {
   address: string
   phone: string
   website: string
+  socialLinks: SocialLink[]
   isOpen: boolean
   isActive: boolean
   bookingDepositPerGuest?: number | null
   refundWindowHours?: number | null
 }
+
+/**
+ * What actually goes over the wire. `website` is optional here because the
+ * backend's @IsOptional() only skips null/undefined — an empty string still
+ * reaches @IsUrl() and 400s the whole request, so we omit it instead.
+ */
+type BarSubmitData = Omit<BarFormData, 'website'> & { website?: string }
 
 export function BarForm({ bar, onSuccess, onCancel }: BarFormProps) {
   const [specialties, setSpecialties] = useState<string[]>(bar?.specialties || [])
@@ -41,7 +50,7 @@ export function BarForm({ bar, onSuccess, onCancel }: BarFormProps) {
   const [newProduct, setNewProduct] = useState('')
   const queryClient = useQueryClient()
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<BarFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, watch, control } = useForm<BarFormData>({
     defaultValues: {
       name: bar?.name || '',
       type: bar?.type || '',
@@ -52,6 +61,9 @@ export function BarForm({ bar, onSuccess, onCancel }: BarFormProps) {
       address: bar?.address || '',
       phone: bar?.phone || '',
       website: bar?.website || '',
+      // Not on the Bar type in lib/types.ts yet, hence the cast — same pattern
+      // as bookingDepositPerGuest below.
+      socialLinks: ((bar as any)?.socialLinks as SocialLink[]) ?? [],
       isOpen: bar?.isOpen || true,
       isActive: bar?.isActive || true,
       bookingDepositPerGuest: (bar as any)?.bookingDepositPerGuest ?? null,
@@ -62,7 +74,7 @@ export function BarForm({ bar, onSuccess, onCancel }: BarFormProps) {
   const isPublished = watch('isActive')
 
   const createMutation = useMutation(
-    (data: BarFormData) => api.post('/bars', data),
+    (data: BarSubmitData) => api.post('/bars', data),
     {
       onSuccess: () => {
         queryClient.invalidateQueries('bars')
@@ -75,7 +87,7 @@ export function BarForm({ bar, onSuccess, onCancel }: BarFormProps) {
   )
 
   const updateMutation = useMutation(
-    (data: BarFormData) => api.patch(`/bars/${bar?.id}`, data),
+    (data: BarSubmitData) => api.patch(`/bars/${bar?.id}`, data),
     {
       onSuccess: () => {
         queryClient.invalidateQueries('bars')
@@ -110,11 +122,14 @@ export function BarForm({ bar, onSuccess, onCancel }: BarFormProps) {
   }
 
   const onSubmit = (data: BarFormData) => {
-    const submitData = {
+    const website = data.website?.trim()
+    const submitData: BarSubmitData = {
       ...data,
       specialties,
       products,
       mediaGallery: bar?.mediaGallery || [],
+      socialLinks: cleanSocialLinks(data.socialLinks),
+      website: website ? website : undefined,
     }
 
     if (bar) {
@@ -376,6 +391,24 @@ export function BarForm({ bar, onSuccess, onCancel }: BarFormProps) {
             placeholder="https://example.com"
           />
         </div>
+      </div>
+
+      {/* Social & Links */}
+      <div className="form-section space-y-4">
+        <div>
+          <h3 className="section-title">Social & Links</h3>
+          <p className="section-description">
+            Social profiles and any other pages worth linking. The website above stays the primary site.
+          </p>
+        </div>
+
+        <Controller
+          control={control}
+          name="socialLinks"
+          render={({ field }) => (
+            <SocialLinksField value={field.value ?? []} onChange={field.onChange} />
+          )}
+        />
       </div>
 
       {/* Form Actions */}

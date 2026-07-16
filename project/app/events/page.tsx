@@ -1,12 +1,15 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { CalendarDays, Search } from 'lucide-react'
 import Header from '../../components/Header'
 import Footer from '../../components/Footer'
-import LoadingSpinner from '../../components/LoadingSpinner'
+import SitePromoBand from '../../components/SitePromoBand'
+import ListingCard, { ListingCardSkeleton } from '../../components/ListingCard'
+import { EmptyState, ListingGrid } from '../../components/ui/Section'
 import { apiService } from '../../lib/api'
 import { Event } from '../../lib/types'
+import { formatPrice, formatEventDate, formatEventTime } from '../../lib/format'
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([])
@@ -31,30 +34,30 @@ export default function EventsPage() {
   }, [])
 
   const filteredEvents = events.filter((event) => {
-    const matchesSearch = 
+    const matchesSearch =
       event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
       event.category.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesCategory = categoryFilter === 'All Categories' || event.category === categoryFilter
-    
+
     return matchesSearch && matchesCategory
   })
 
   const uniqueCategories = ['All Categories', ...Array.from(new Set(events.map(e => e.category)))]
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-cream">
       <Header />
-      
+
       <main>
         {/* Hero Section */}
-        <section className="bg-gradient-to-r from-yellow-600 to-yellow-500 text-black py-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <h1 className="text-4xl md:text-5xl font-bold mb-4">
+        <section className="border-b border-charcoal-200 bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-2xl text-center">
+              <h1 className="font-display text-4xl font-bold tracking-tight text-ink md:text-5xl">
                 Premium Events
               </h1>
-              <p className="text-xl text-black/80 mb-8 max-w-2xl mx-auto">
+              <p className="mt-4 text-lg text-charcoal-600">
                 Join exclusive tastings, masterclasses, and social events
               </p>
             </div>
@@ -62,23 +65,35 @@ export default function EventsPage() {
         </section>
 
         {/* Search and Filters */}
-        <section className="py-8 bg-gray-900">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
+        <section className="border-b border-charcoal-200 bg-white py-6">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-4 md:flex-row">
+              <div className="relative flex-1">
+                <Search
+                  className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400"
+                  strokeWidth={1.75}
+                />
+                <label htmlFor="events-search" className="sr-only">
+                  Search events
+                </label>
                 <input
+                  id="events-search"
                   type="text"
                   placeholder="Search events, venues, or categories..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                  className="input-field pl-11"
                 />
               </div>
-              <div className="flex gap-4">
-                <select 
+              <div className="flex flex-col gap-4 sm:flex-row">
+                <label htmlFor="events-category" className="sr-only">
+                  Filter by category
+                </label>
+                <select
+                  id="events-category"
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-yellow-500"
+                  className="input-field sm:w-52"
                 >
                   {uniqueCategories.map(category => (
                     <option key={category} value={category}>{category}</option>
@@ -90,87 +105,50 @@ export default function EventsPage() {
         </section>
 
         {/* Events Grid */}
-        <section className="py-16 bg-black">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Site-wide promo — same campaign on every page (byFood-style). */}
+        <SitePromoBand className="pt-12" />
+
+        <section className="bg-cream py-16">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             {loading ? (
-              <div className="flex justify-center py-12">
-                <LoadingSpinner />
-              </div>
-            ) : filteredEvents.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {filteredEvents.map((event) => (
-                  <Link key={event.id} href={`/events/${event.id}`}>
-                    <div className="bg-gray-900 rounded-xl shadow-lg overflow-hidden hover:shadow-yellow-500/20 transition-shadow group cursor-pointer">
-                  {/* Event Image */}
-                  <div className="relative h-48">
-                    <div 
-                      className="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-300"
-                      style={{ backgroundImage: `url(${event.image})` }}
-                    />
-                    <div className="absolute top-4 left-4">
-                      <span className="px-3 py-1 bg-yellow-500 text-black text-xs rounded-full font-semibold">
-                        {event.category}
-                      </span>
-                    </div>
-                    <div className="absolute top-4 right-4">
-                      <div className="bg-black/80 backdrop-blur-sm rounded-full p-2">
-                        <span className="text-yellow-500 text-sm font-bold">💰</span>
-                        <span className="text-white text-sm font-semibold ml-1">
-                          {event.price}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="absolute bottom-4 left-4">
-                      <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
-                        {event.capacity}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Event Info */}
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-yellow-400 transition-colors">
-                      {event.name}
-                    </h3>
-                    <p className="text-gray-400 mb-2">{event.type}</p>
-                    <p className="text-gray-500 text-sm mb-4">{event.description}</p>
-                    
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center text-sm text-gray-400">
-                        <span className="mr-2">📅</span>
-                        {new Date(event.date).toLocaleDateString('en-US', { 
-                          weekday: 'short', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })} at {event.time}
-                      </div>
-                      <div className="flex items-center text-sm text-gray-400">
-                        <span className="mr-2">📍</span>
-                        {event.location}
-                      </div>
-                      <div className="flex items-center text-sm text-gray-400">
-                        <span className="mr-2">👥</span>
-                        {event.capacity}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="text-yellow-400 font-bold text-lg">
-                        {event.price}
-                      </div>
-                      <div className="text-yellow-400 font-semibold">
-                        Book Now →
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                  </Link>
+              <ListingGrid>
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <ListingCardSkeleton key={i} />
                 ))}
-              </div>
+              </ListingGrid>
+            ) : filteredEvents.length > 0 ? (
+              <ListingGrid>
+                {filteredEvents.map((event) => (
+                  /*
+                   * No `rating` prop: the Event entity carries no rating/reviews
+                   * columns, and omitting it drops the stars row entirely.
+                   * Passing null here would render a misleading "New".
+                   */
+                  <ListingCard
+                    key={event.id}
+                    href={`/events/${event.id}`}
+                    image={event.image}
+                    title={event.name}
+                    meta={[
+                      event.location,
+                      [formatEventDate(event.date), formatEventTime(event.time)]
+                        .filter(Boolean)
+                        .join(', '),
+                    ]}
+                    tags={[{ label: event.category }]}
+                    badge={event.isFeatured ? { label: 'Featured' } : null}
+                    pricePrefix="From"
+                    price={formatPrice(event.price)}
+                    priceSuffix="per guest"
+                  />
+                ))}
+              </ListingGrid>
             ) : (
-              <div className="text-center py-12">
-                <p className="text-gray-400 text-lg">No events found</p>
-              </div>
+              <EmptyState
+                icon={<CalendarDays className="h-12 w-12" strokeWidth={1.25} />}
+                title="No events found"
+                description="Try a different search term, or clear the category filter."
+              />
             )}
           </div>
         </section>

@@ -1,114 +1,166 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { Instagram, Facebook, Youtube, Mail, MapPin } from 'lucide-react'
+import Logo from './Logo'
+
+/** X (formerly Twitter) — lucide dropped its Twitter glyph, so inline it. */
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  )
+}
+
+/**
+ * Shipped footer copy — the guaranteed fallback. The CMS `site_footer` section
+ * can override any of these fields, but a failed/absent fetch must never blank
+ * the footer, so these values always render when an override is missing.
+ */
+const FOOTER_DEFAULTS = {
+  tagline:
+    'The marketplace for whisky experiences — tastings, distillery tours, bar events and festivals. Book direct, drink well.',
+  email: 'hello@destinationwhisky.life',
+  location: 'Sydney, Australia',
+  instagram: 'https://instagram.com',
+  facebook: 'https://facebook.com',
+  youtube: 'https://youtube.com',
+  twitter: 'https://x.com',
+  copyright: `© ${new Date().getFullYear()} Destination Whisky. All rights reserved.`,
+}
+
+type FooterCopy = typeof FOOTER_DEFAULTS
+
+/** Structure is fixed; only these labels/hrefs come from the CMS. */
+const SOCIAL_LINKS = [
+  { label: 'Instagram', key: 'instagram', Icon: Instagram },
+  { label: 'Facebook', key: 'facebook', Icon: Facebook },
+  { label: 'YouTube', key: 'youtube', Icon: Youtube },
+  { label: 'X', key: 'twitter', Icon: XIcon },
+] as const
+
+const EXPLORE = [
+  { href: '/bars', label: 'Whisky Bars' },
+  { href: '/distilleries', label: 'Distilleries' },
+  { href: '/events', label: 'Events' },
+  { href: '/collections', label: 'Collections' },
+  { href: '/blog', label: 'Journal' },
+]
+
+const COMPANY = [
+  { href: '/about', label: 'About us' },
+  { href: '/feedback', label: 'Send feedback' },
+  { href: '/cookies', label: 'Cookie policy' },
+]
+
+/** Keep a provided string, else fall back to the shipped default. */
+function pick(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : fallback
+}
 
 export default function Footer() {
+  const [copy, setCopy] = useState<FooterCopy>(FOOTER_DEFAULTS)
+
+  useEffect(() => {
+    let cancelled = false
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
+    // GET /homepage/site_footer → { section, content } or 404 when never set.
+    // On any failure we keep the shipped defaults — the footer never blanks.
+    fetch(`${base}/homepage/site_footer`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data || typeof data.content !== 'object' || !data.content) return
+        const c = data.content
+        setCopy({
+          tagline: pick(c.tagline, FOOTER_DEFAULTS.tagline),
+          email: pick(c.email, FOOTER_DEFAULTS.email),
+          location: pick(c.location, FOOTER_DEFAULTS.location),
+          instagram: pick(c.instagram, FOOTER_DEFAULTS.instagram),
+          facebook: pick(c.facebook, FOOTER_DEFAULTS.facebook),
+          youtube: pick(c.youtube, FOOTER_DEFAULTS.youtube),
+          twitter: pick(c.twitter, FOOTER_DEFAULTS.twitter),
+          copyright: pick(c.copyright, FOOTER_DEFAULTS.copyright),
+        })
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
-    <footer className="bg-black border-t border-gray-800 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Company Info */}
+    <footer className="bg-charcoal-900 text-charcoal-300">
+      <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-2">
-            <h3 className="text-2xl font-bold text-primary-500 mb-4">
-              ByFoods
-            </h3>
-            <p className="text-gray-400 mb-6 leading-relaxed">
-              Your premier destination for premium bars, distilleries, and exclusive events. 
-              Experience the finest in nightlife and entertainment.
-            </p>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                <span className="sr-only">Facebook</span>
-                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                <span className="sr-only">Twitter</span>
-                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-                </svg>
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                <span className="sr-only">Instagram</span>
-                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 6.62 5.367 11.987 11.988 11.987 6.62 0 11.987-5.367 11.987-11.987C24.014 5.367 18.637.001 12.017.001zM8.449 16.988c-1.297 0-2.448-.49-3.323-1.297C4.198 14.895 3.708 13.744 3.708 12.447s.49-2.448 1.297-3.323c.875-.807 2.026-1.297 3.323-1.297s2.448.49 3.323 1.297c.807.875 1.297 2.026 1.297 3.323s-.49 2.448-1.297 3.323c-.875.807-2.026 1.297-3.323 1.297zm7.718-1.297c-.875.807-2.026 1.297-3.323 1.297s-2.448-.49-3.323-1.297c-.807-.875-1.297-2.026-1.297-3.323s.49-2.448 1.297-3.323c.875-.807 2.026-1.297 3.323-1.297s2.448.49 3.323 1.297c.807.875 1.297 2.026 1.297 3.323s-.49 2.448-1.297 3.323z"/>
-                </svg>
-              </a>
+            <Logo className="text-whisky-400" />
+            <p className="mt-5 max-w-md leading-relaxed text-charcoal-400">{copy.tagline}</p>
+
+            <div className="mt-6 flex gap-3">
+              {SOCIAL_LINKS.map(({ label, key, Icon }) => (
+                <a
+                  key={label}
+                  href={copy[key]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="grid h-10 w-10 place-items-center rounded-full border border-charcoal-700 text-charcoal-400 transition-colors hover:border-whisky-500 hover:text-whisky-400"
+                >
+                  <span className="sr-only">{label}</span>
+                  <Icon className="h-4 w-4" />
+                </a>
+              ))}
             </div>
           </div>
 
-          {/* Quick Links */}
           <div>
-            <h4 className="text-lg font-semibold mb-4">Quick Links</h4>
+            <h4 className="mb-4 font-display text-base font-semibold text-white">Explore</h4>
             <ul className="space-y-3">
-              <li>
-                <a href="/bars" className="text-gray-400 hover:text-white transition-colors">
-                  Bars
-                </a>
-              </li>
-              <li>
-                <a href="/distilleries" className="text-gray-400 hover:text-white transition-colors">
-                  Distilleries
-                </a>
-              </li>
-              <li>
-                <a href="/events" className="text-gray-400 hover:text-white transition-colors">
-                  Events
-                </a>
-              </li>
-              <li>
-                <a href="/blog" className="text-gray-400 hover:text-white transition-colors">
-                  Blog
-                </a>
-              </li>
-              <li>
-                <a href="/about" className="text-gray-400 hover:text-white transition-colors">
-                  About
-                </a>
-              </li>
-              <li>
-                <a href="/feedback" className="text-gray-400 hover:text-white transition-colors">
-                  Send feedback
-                </a>
-              </li>
+              {EXPLORE.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-charcoal-400 transition-colors hover:text-whisky-400">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Contact Info */}
           <div>
-            <h4 className="text-lg font-semibold mb-4">Contact Us</h4>
-            <div className="space-y-3 text-gray-400">
-              <div className="flex items-start">
-                <svg className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                </svg>
-                <span>123 Food Street, New York, NY 10001</span>
-              </div>
-              <div className="flex items-center">
-                <svg className="h-5 w-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                </svg>
-                <span>support@byfoods.com</span>
-              </div>
-              <div className="flex items-center">
-                <svg className="h-5 w-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                </svg>
-                <span>+1 (555) 123-4567</span>
-              </div>
+            <h4 className="mb-4 font-display text-base font-semibold text-white">Company</h4>
+            <ul className="space-y-3">
+              {COMPANY.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-charcoal-400 transition-colors hover:text-whisky-400">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            {/* Location and email are CMS-overridable via the site_footer section. */}
+            <div className="mt-6 space-y-2.5 text-sm">
+              <p className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 shrink-0 text-whisky-500" />
+                {copy.location}
+              </p>
+              <a
+                href={`mailto:${copy.email}`}
+                className="flex items-center gap-2 transition-colors hover:text-whisky-400"
+              >
+                <Mail className="h-4 w-4 shrink-0 text-whisky-500" />
+                {copy.email}
+              </a>
             </div>
           </div>
         </div>
 
-        {/* Bottom Section */}
-        <div className="border-t border-gray-800 mt-12 pt-8">
-          <div className="text-gray-400 text-sm text-center">
-            © {new Date().getFullYear()} ByFoods. All rights reserved.
-          </div>
+        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-charcoal-800 pt-8 text-sm text-charcoal-500 sm:flex-row">
+          <p>{copy.copyright}</p>
+          <p>Please enjoy responsibly. 18+</p>
         </div>
       </div>
     </footer>
   )
-} 
+}

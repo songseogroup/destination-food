@@ -1,23 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { motion } from 'framer-motion'
-import { Plus, Search, Settings, Trash2, Eye, EyeOff } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
-import { isSuperAdmin } from '@/lib/roles'
+import { isPlatformRole } from '@/lib/roles'
 import { Distillery } from '@/lib/types'
+import { DistilleryForm } from '@/components/DistilleryForm'
+import { Modal } from '@/components/Modal'
 import toast from 'react-hot-toast'
 
 export default function DistilleriesPage() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editingDistillery, setEditingDistillery] = useState<Distillery | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const router = useRouter()
   const queryClient = useQueryClient()
-  const canCreate = isSuperAdmin(auth.getUser()?.role)
+  // Platform staff (admin + super_admin) can create listings. This was
+  // isSuperAdmin only, which paired with the backend's @Roles(ADMIN, ...) —
+  // that omitted SUPER_ADMIN — meant nobody could actually create one.
+  const canCreate = isPlatformRole(auth.getUser()?.role)
 
   const { data: distilleriesData, isLoading } = useQuery(
     ['distilleries', currentPage, searchTerm],
@@ -70,8 +74,22 @@ export default function DistilleriesPage() {
     toggleActiveMutation.mutate({ id: distillery.id, isActive: distillery.isActive })
   }
 
-  const handleCreateNew = () => {
-    router.push('/dashboard/distilleries/new')
+  const handleEdit = (distillery: Distillery) => {
+    setEditingDistillery(distillery)
+    setShowForm(true)
+  }
+
+  const handleFormClose = () => {
+    setShowForm(false)
+    setEditingDistillery(null)
+  }
+
+  const handleFormSuccess = () => {
+    queryClient.invalidateQueries('distilleries')
+    handleFormClose()
+    toast.success(
+      editingDistillery ? 'Distillery updated successfully' : 'Distillery created successfully'
+    )
   }
 
   return (
@@ -84,7 +102,7 @@ export default function DistilleriesPage() {
         </div>
         {canCreate && (
           <button
-            onClick={handleCreateNew}
+            onClick={() => setShowForm(true)}
             className="btn-primary"
           >
             <Plus className="h-5 w-5 mr-2" />
@@ -192,13 +210,13 @@ export default function DistilleriesPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        <Link
-                          href={`/dashboard/distilleries/${distillery.id}`}
+                        <button
+                          onClick={() => handleEdit(distillery)}
                           className="text-primary-600 hover:text-primary-900"
                           title="Edit distillery details"
                         >
-                          <Settings className="h-4 w-4" />
-                        </Link>
+                          <Edit className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleToggleActive(distillery)}
                           className="text-gray-600 hover:text-gray-900"
@@ -247,6 +265,20 @@ export default function DistilleriesPage() {
           </div>
         )}
       </div>
+
+      {/* Distillery Form Modal */}
+      <Modal
+        isOpen={showForm}
+        onClose={handleFormClose}
+        title={editingDistillery ? 'Edit Distillery' : 'Add New Distillery'}
+        size="xl"
+      >
+        <DistilleryForm
+          distillery={editingDistillery}
+          onSuccess={handleFormSuccess}
+          onCancel={handleFormClose}
+        />
+      </Modal>
     </div>
   )
 }

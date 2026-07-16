@@ -1,3 +1,5 @@
+const tokens = require('./lib/design-tokens')
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -8,34 +10,24 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#fefce8',
-          100: '#fef9c3',
-          200: '#fef08a',
-          300: '#fde047',
-          400: '#facc15',
-          500: '#eab308',
-          600: '#ca8a04',
-          700: '#a16207',
-          800: '#854d0e',
-          900: '#713f12',
-        },
-        gray: {
-          50: '#f9fafb',
-          100: '#f3f4f6',
-          200: '#e5e7eb',
-          300: '#d1d5db',
-          400: '#9ca3af',
-          500: '#6b7280',
-          600: '#4b5563',
-          700: '#374151',
-          800: '#1f2937',
-          900: '#111827',
-        }
+        ...tokens.colors,
+        /**
+         * `gray` is remapped onto the charcoal ramp rather than removed.
+         *
+         * The admin already overrode tailwind's default gray here, and ~50 pages
+         * use `gray-*` classes directly. Aliasing it to charcoal re-tones the
+         * entire dashboard to the warm brand neutral without touching those
+         * files, and keeps it in step with the customer site. 950 is declared
+         * explicitly because `extend` deep-merges — omitting it would leave
+         * `text-gray-950` (used by .section-title) on tailwind's cool default.
+         */
+        gray: tokens.colors.charcoal,
       },
-      fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-      },
+      borderRadius: tokens.borderRadius,
+      boxShadow: tokens.boxShadow,
+      fontFamily: tokens.fontFamily,
+      animation: tokens.animation,
+      keyframes: tokens.keyframes,
     },
   },
   plugins: [],

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react'
+import Logo from '@/components/Logo'
 import toast from 'react-hot-toast'
 import { auth } from '@/lib/auth'
 
@@ -32,7 +33,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-cream p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -41,12 +42,8 @@ export default function LoginPage() {
       >
         <div className="card">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              ByFoods CMS
-            </h1>
-            <p className="text-gray-600">
-              Sign in to your admin account
-            </p>
+            <Logo variant="stacked" className="mb-5 inline-flex text-charcoal-900" asLink={false} />
+            <p className="text-charcoal-500">Sign in to your admin account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -61,7 +58,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="input-field pl-10"
-                  placeholder="admin@byfoods.com"
+                  placeholder="you@destinationwhisky.life"
                   required
                 />
               </div>
@@ -115,13 +112,13 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 text-center">
-              <strong>Default Admin Credentials:</strong><br />
-              Email: admin@byfoods.com<br />
-              Password: admin123
-            </p>
-          </div>
+          {/*
+            The default admin email and password used to be printed here, on the
+            public login page of a deployed CMS — anyone who loaded /login could
+            read them. Removed. Credentials are set per environment via
+            SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD, or reset with
+            backend/scripts/reset-super-admin.js.
+          */}
         </div>
       </motion.div>
     </div>

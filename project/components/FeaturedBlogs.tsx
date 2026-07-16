@@ -1,21 +1,44 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { BookOpen } from 'lucide-react'
 import { apiService } from '../lib/api'
 import { Blog } from '../lib/types'
+import ArticleCard, { ArticleCardSkeleton } from './ArticleCard'
+import Section, { EmptyState } from './ui/Section'
+import CardCarousel from './ui/CardCarousel'
 
-export default function FeaturedBlogs() {
+/**
+ * `content` comes from the CMS (homepage_content.content) via the section
+ * registry. Every field is optional and falls back to the shipped copy, so the
+ * section still renders correctly if the API is down or a field is blank.
+ */
+interface FeaturedBlogsProps {
+  content?: {
+    title?: string
+    description?: string
+    viewAllLabel?: string
+    tone?: 'cream' | 'white'
+  }
+}
+
+export default function FeaturedBlogs({ content }: FeaturedBlogsProps = {}) {
   const [blogPosts, setBlogPosts] = useState<Blog[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchBlogs = async () => {
       try {
-        const response = await apiService.getBlogs({ limit: 3, featured: true })
+        // NOTE: do NOT pass `featured: true` here. The /blogs list endpoint uses
+        // PaginationDto with forbidNonWhitelisted, so any param other than
+        // page/limit returns 400 — which silently emptied this rail. (There is a
+        // separate /blogs/featured endpoint, but /blogs?limit gives us the
+        // recent posts this "From the Journal" rail wants anyway.)
+        const response = await apiService.getBlogs({ limit: 12 })
         setBlogPosts(response.data.data || [])
       } catch (error) {
         console.error('Error fetching featured blogs:', error)
+        setBlogPosts([])
       } finally {
         setLoading(false)
       }
@@ -23,101 +46,45 @@ export default function FeaturedBlogs() {
 
     fetchBlogs()
   }, [])
+
   return (
-    <section className="py-16 bg-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Latest Blog Posts
-          </h2>
-          <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-            Stay updated with the latest trends in nightlife, spirits, and entertainment
-          </p>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-400">Loading...</p>
-          </div>
-        ) : blogPosts.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {blogPosts.map((post) => (
-            <Link 
-              key={post.id} 
+    <Section
+      title={content?.title || 'From the Journal'}
+      subtitle={content?.description || 'Tasting notes, distillery stories and the odd strong opinion'}
+      viewAllHref={blogPosts.length > 0 ? '/blog' : undefined}
+      viewAllLabel={content?.viewAllLabel || 'Read the journal'}
+      align="left"
+      tone={content?.tone || 'white'}
+    >
+      {loading ? (
+        <CardCarousel label="journal posts">
+          {[1, 2, 3, 4].map((i) => (
+            <ArticleCardSkeleton key={i} />
+          ))}
+        </CardCarousel>
+      ) : blogPosts.length > 0 ? (
+        <CardCarousel label="journal posts">
+          {blogPosts.map((post) => (
+            <ArticleCard
+              key={post.id}
               href={`/blog/${post.id}`}
-              className="group cursor-pointer block"
-            >
-              <div className="bg-black rounded-xl shadow-lg overflow-hidden hover:shadow-yellow-500/20 transition-shadow">
-                <div className="relative h-48">
-                  <div 
-                    className="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-300"
-                    style={{ backgroundImage: `url(${post.image})` }}
-                  />
-                  <div className="absolute top-4 left-4">
-                    <span className="px-3 py-1 bg-primary-500 text-black text-xs rounded-full font-semibold">
-                      {post.category}
-                    </span>
-                  </div>
-                  {post.featured && (
-                    <div className="absolute top-4 right-4">
-                      <span className="px-3 py-1 bg-yellow-500 text-black text-xs rounded-full font-semibold">
-                        Featured
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-white mb-3 group-hover:text-primary-500 transition-colors">
-                    {post.title}
-                  </h3>
-                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                    {post.excerpt}
-                  </p>
-                  
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                    <div className="flex items-center">
-                      <span className="mr-2">👤</span>
-                      {post.author}
-                    </div>
-                    <div className="flex items-center">
-                      <span className="mr-2">📖</span>
-                      {post.readTime}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-400">
-                      {new Date(post.date).toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </div>
-                    <div className="text-primary-500 font-semibold">
-                      Read More →
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-400">No blog posts available</p>
-          </div>
-        )}
-
-        <div className="text-center mt-12">
-          <Link 
-            href="/blog" 
-            className="btn-secondary text-lg px-8 py-3"
-          >
-            View All Posts
-          </Link>
-        </div>
-      </div>
-    </section>
+              image={post.image}
+              title={post.title}
+              excerpt={post.excerpt}
+              author={post.author}
+              readTime={post.readTime}
+              category={post.category}
+              featured={post.featured}
+            />
+          ))}
+        </CardCarousel>
+      ) : (
+        <EmptyState
+          icon={<BookOpen className="h-12 w-12" strokeWidth={1.25} />}
+          title="No posts yet"
+          description="Tasting notes and distillery stories will land here soon."
+        />
+      )}
+    </Section>
   )
 }

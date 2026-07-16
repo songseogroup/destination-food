@@ -27,7 +27,7 @@ export default function EventDetailPage() {
 
   return (
     <div className="space-y-6">
-      <AdminDetailNav id={id} type="events" name={event.name} />
+      <AdminDetailNav id={id} type="events" name={event.name} isActive={event.isActive !== false} />
       
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Edit Event Details</h2>

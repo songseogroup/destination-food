@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import {
   LayoutDashboard,
   BarChart3,
+  TrendingUp,
   MapPin,
   Calendar,
   FileText,
@@ -27,6 +28,7 @@ import {
 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { roleLabels } from '@/lib/roles'
+import Logo from './Logo'
 
 const isActiveRoute = (pathname: string, href: string) => {
   if (href === '/dashboard') {
@@ -38,6 +40,7 @@ const isActiveRoute = (pathname: string, href: string) => {
 
 const superAdminNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp },
   { name: 'Homepage', href: '/dashboard/homepage', icon: Home },
   { name: 'Banners', href: '/dashboard/admin/banners', icon: ImageIcon },
   { name: 'Team & Admins', href: '/dashboard/admin/users', icon: ShieldCheck },
@@ -58,6 +61,7 @@ const superAdminNavigation = [
 
 const adminNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp },
   { name: 'Homepage', href: '/dashboard/homepage', icon: Home },
   { name: 'Bars', href: '/dashboard/bars', icon: BarChart3 },
   { name: 'Distilleries', href: '/dashboard/distilleries', icon: MapPin },
@@ -69,6 +73,22 @@ const adminNavigation = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
+/**
+ * Owner navigation. Per the pay plan, a vendor needs: upcoming bookings,
+ * customer contacts, event management, ticket analytics, revenue and payouts.
+ */
+const ownerNavigation = (opts: { menu: boolean }) => [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp },
+  { name: 'My Listing', href: '/dashboard/details', icon: Edit },
+  { name: 'Media', href: '/dashboard/media', icon: Upload },
+  ...(opts.menu ? [{ name: 'Menu', href: '/dashboard/menu', icon: List }] : []),
+  { name: 'Reviews', href: '/dashboard/reviews', icon: Star },
+  { name: 'Bookings', href: '/dashboard/orders', icon: ShoppingCart },
+  { name: 'Finance', href: '/dashboard/finance', icon: DollarSign },
+  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+]
+
 const getRoleNavigation = (role: string) => {
   switch (role) {
     case 'super_admin':
@@ -76,43 +96,15 @@ const getRoleNavigation = (role: string) => {
     case 'admin':
       return adminNavigation
     case 'bar':
-      return [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'My Listing', href: '/dashboard/details', icon: Edit },
-        { name: 'Media', href: '/dashboard/media', icon: Upload },
-        { name: 'Menu', href: '/dashboard/menu', icon: List },
-        { name: 'Reviews', href: '/dashboard/reviews', icon: Star },
-        { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
-        { name: 'Finance', href: '/dashboard/finance', icon: DollarSign },
-        { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-      ]
     case 'distillery':
-      return [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'My Listing', href: '/dashboard/details', icon: Edit },
-        { name: 'Media', href: '/dashboard/media', icon: Upload },
-        { name: 'Menu', href: '/dashboard/menu', icon: List },
-        { name: 'Reviews', href: '/dashboard/reviews', icon: Star },
-        { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
-        { name: 'Finance', href: '/dashboard/finance', icon: DollarSign },
-        { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-      ]
+      return ownerNavigation({ menu: true })
     case 'event_host':
     case 'tour_operator':
-      return [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'My Listing', href: '/dashboard/details', icon: Edit },
-        { name: 'Media', href: '/dashboard/media', icon: Upload },
-        { name: 'Reviews', href: '/dashboard/reviews', icon: Star },
-        { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
-        { name: 'Finance', href: '/dashboard/finance', icon: DollarSign },
-        { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-      ]
+      return ownerNavigation({ menu: false })
     default:
-      return [
-        ...adminNavigation,
-        { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
-      ]
+      // Previously this spread adminNavigation and then appended a second
+      // Orders entry, rendering Orders twice with a duplicate React key.
+      return adminNavigation
   }
 }
 
@@ -130,118 +122,68 @@ export function Sidebar() {
     }
   }, [])
 
+  // Desktop and mobile rendered identical markup twice; any branding change had
+  // to be made in both. One definition now, mounted in two shells.
+  const panel = (onNavigate?: () => void) => (
+    <div className="flex h-full flex-col bg-charcoal-900">
+      <div className="border-b border-charcoal-800 px-5 py-5">
+        <Logo className="text-whisky-400 transition-colors hover:text-whisky-300" />
+        <p className="mt-2 pl-[3.1rem] text-xs text-charcoal-500">{userRole}</p>
+      </div>
+
+      <nav className="scrollbar-hide flex-1 space-y-1 overflow-y-auto px-3 py-5">
+        {navigation.map((item) => {
+          const isActive = isActiveRoute(pathname, item.href)
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              aria-current={isActive ? 'page' : undefined}
+              className={`sidebar-link ${isActive ? 'active' : ''}`}
+              onClick={onNavigate}
+            >
+              <item.icon className="mr-3 h-4 w-4 shrink-0" strokeWidth={1.75} />
+              {item.name}
+            </Link>
+          )
+        })}
+      </nav>
+
+      <div className="border-t border-charcoal-800 px-4 py-4">
+        <p className="text-center text-xs text-charcoal-600">Destination Whisky v1.0.0</p>
+      </div>
+    </div>
+  )
+
   return (
     <>
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      <div className="fixed left-4 top-4 z-50 lg:hidden">
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-md bg-white shadow-md"
+          aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={mobileMenuOpen}
+          className="rounded-xl bg-charcoal-900 p-2 text-charcoal-200 shadow-card"
         >
-          {mobileMenuOpen ? (
-            <X className="h-6 w-6 text-gray-600" />
-          ) : (
-            <Menu className="h-6 w-6 text-gray-600" />
-          )}
+          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
 
-      {/* Mobile backdrop */}
       {mobileMenuOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="fixed inset-0 z-40 bg-charcoal-950/60 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:flex lg:flex-col lg:w-64 lg:bg-white lg:shadow-lg">
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">BF</span>
-              </div>
-              <div className="ml-3">
-                <h1 className="text-lg font-semibold text-gray-900">ByFoods CMS</h1>
-                <p className="text-xs text-gray-500">{userRole} Dashboard</p>
-              </div>
-            </div>
-          </div>
+      <div className="hidden lg:flex lg:w-64 lg:flex-col">{panel()}</div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            {navigation.map((item) => {
-              const isActive = isActiveRoute(pathname, item.href)
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`sidebar-link ${isActive ? 'active' : ''}`}
-                >
-                  <item.icon className="h-5 w-5 mr-3" />
-                  {item.name}
-                </Link>
-              )
-            })}
-          </nav>
-
-          {/* Footer */}
-          <div className="px-4 py-4 border-t border-gray-200">
-            <div className="text-xs text-gray-500 text-center">
-              ByFoods CMS v1.0.0
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Sidebar */}
       <motion.div
         initial={{ x: -256 }}
         animate={{ x: mobileMenuOpen ? 0 : -256 }}
         transition={{ duration: 0.3 }}
-        className="lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg"
+        className="fixed inset-y-0 left-0 z-50 w-64 shadow-lifted lg:hidden"
       >
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">BF</span>
-              </div>
-              <div className="ml-3">
-                <h1 className="text-lg font-semibold text-gray-900">ByFoods CMS</h1>
-                <p className="text-xs text-gray-500">{userRole} Dashboard</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            {navigation.map((item) => {
-              const isActive = isActiveRoute(pathname, item.href)
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`sidebar-link ${isActive ? 'active' : ''}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <item.icon className="h-5 w-5 mr-3" />
-                  {item.name}
-                </Link>
-              )
-            })}
-          </nav>
-
-          {/* Footer */}
-          <div className="px-4 py-4 border-t border-gray-200">
-            <div className="text-xs text-gray-500 text-center">
-              ByFoods CMS v1.0.0
-            </div>
-          </div>
-        </div>
+        {panel(() => setMobileMenuOpen(false))}
       </motion.div>
     </>
   )

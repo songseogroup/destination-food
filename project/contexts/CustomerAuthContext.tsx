@@ -33,6 +33,8 @@ interface CustomerAuthContextType {
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   signup: (data: SignupData) => Promise<void>
+  /** Exchanges a Google ID token for a session. Covers both sign-in and sign-up. */
+  loginWithGoogle: (idToken: string) => Promise<void>
   logout: () => void
   updatePreferences: (preferences: Partial<Customer['preferences']>) => Promise<void>
 }
@@ -102,6 +104,19 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const loginWithGoogle = async (idToken: string) => {
+    try {
+      const response = await apiService.googleAuthCustomer(idToken)
+      if (response.data?.customer && response.data?.token) {
+        saveAuthData(response.data.customer, response.data.token)
+      } else {
+        throw new Error('Invalid Google sign-in response')
+      }
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Google sign-in failed')
+    }
+  }
+
   const logout = () => {
     localStorage.removeItem(STORAGE_KEY)
     apiService.setAuthToken('')
@@ -128,6 +143,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         signup,
+        loginWithGoogle,
         logout,
         updatePreferences,
       }}

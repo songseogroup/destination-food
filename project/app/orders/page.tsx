@@ -20,6 +20,7 @@ import Header from '../../components/Header'
 import Footer from '../../components/Footer'
 import { apiService } from '../../lib/api'
 import { useCustomerAuth } from '../../contexts/CustomerAuthContext'
+import { formatPrice } from '../../lib/format'
 
 interface OrderRow {
   id: number
@@ -36,10 +37,10 @@ interface OrderRow {
 }
 
 const STATUS_META: Record<string, { label: string; bg: string; text: string; icon: React.ElementType }> = {
-  pending: { label: 'Pending confirmation', bg: 'bg-yellow-500/10 border-yellow-500/30', text: 'text-yellow-300', icon: Hourglass },
-  confirmed: { label: 'Confirmed', bg: 'bg-green-500/10 border-green-500/30', text: 'text-green-300', icon: CheckCircle },
-  completed: { label: 'Completed', bg: 'bg-gray-500/10 border-gray-500/30', text: 'text-gray-300', icon: Sparkles },
-  cancelled: { label: 'Cancelled', bg: 'bg-red-500/10 border-red-500/30', text: 'text-red-300', icon: XCircle },
+  pending: { label: 'Pending confirmation', bg: 'bg-status-warningSoft border-status-warning/25', text: 'text-status-warning', icon: Hourglass },
+  confirmed: { label: 'Confirmed', bg: 'bg-status-successSoft border-status-success/25', text: 'text-status-success', icon: CheckCircle },
+  completed: { label: 'Completed', bg: 'bg-charcoal-100 border-charcoal-200', text: 'text-charcoal-600', icon: Sparkles },
+  cancelled: { label: 'Cancelled', bg: 'bg-status-dangerSoft border-status-danger/25', text: 'text-status-danger', icon: XCircle },
 }
 
 function listingFor(o: OrderRow): { name: string; image?: string; href?: string } {
@@ -90,33 +91,36 @@ export default function CustomerOrdersPage() {
   }, [authLoading, isAuthenticated, router])
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-cream">
       <Header />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex items-center gap-3 mb-2">
-          <Ticket className="h-7 w-7 text-primary-500" />
-          <h1 className="text-3xl font-bold">My Bookings</h1>
+          <Ticket className="h-7 w-7 text-whisky-500" />
+          <h1 className="section-title">My Bookings</h1>
         </div>
-        <p className="text-gray-400 mb-8">
+        <p className="text-charcoal-600 mb-8">
           Your reservations across bars, distilleries, and events. Tap any booking to see your ticket.
         </p>
 
         {loading ? (
           <div className="py-16 flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-charcoal-400" />
           </div>
         ) : error ? (
-          <div className="bg-red-900/30 border border-red-700 text-red-300 rounded-xl p-6">
+          <div
+            role="alert"
+            className="rounded-xl border border-status-danger/25 bg-status-dangerSoft p-6 text-status-danger"
+          >
             {error}
           </div>
         ) : orders.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center">
-            <Ticket className="h-12 w-12 text-gray-700 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white">No bookings yet</h3>
-            <p className="text-gray-400 mt-2 max-w-md mx-auto">
+          <div className="card p-12 text-center">
+            <Ticket className="h-12 w-12 text-charcoal-300 mx-auto mb-4" />
+            <h3 className="font-display text-lg font-semibold text-ink">No bookings yet</h3>
+            <p className="text-charcoal-500 mt-2 max-w-md mx-auto">
               When you book a whisky tasting, distillery tour, or event, your tickets will appear here.
             </p>
-            <Link href="/" className="inline-flex items-center gap-2 mt-6 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-black font-semibold rounded-lg">
+            <Link href="/" className="btn-primary mt-6">
               Explore experiences
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -135,47 +139,47 @@ export default function CustomerOrdersPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.04 }}
                   onClick={() => router.push(`/orders/${o.id}`)}
-                  className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden hover:border-primary-500/50 transition-colors cursor-pointer"
+                  className="group card-interactive overflow-hidden cursor-pointer"
                 >
                   <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-0">
                     <div
-                      className="h-32 sm:h-full bg-cover bg-center bg-gray-800"
+                      className="h-32 sm:h-full bg-cover bg-center bg-charcoal-100"
                       style={{ backgroundImage: listing.image ? `url(${listing.image})` : undefined }}
                     />
                     <div className="p-5 flex flex-col gap-2">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-xs font-semibold tracking-wider uppercase text-primary-500">{ref}</p>
-                          <h3 className="text-lg font-semibold text-white mt-0.5">{listing.name}</h3>
+                          <p className="text-xs font-semibold tracking-wider uppercase text-whisky-700">{ref}</p>
+                          <h3 className="font-display text-lg font-semibold text-ink mt-0.5">{listing.name}</h3>
                         </div>
                         <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium ${status.bg} ${status.text}`}>
                           <StatusIcon className="h-3.5 w-3.5" />
                           {status.label}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-400 mt-1">
+                      <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-charcoal-600 mt-1">
                         {o.bookingDate && (
                           <span className="inline-flex items-center gap-1.5">
-                            <Calendar className="h-4 w-4 text-gray-500" />
+                            <Calendar className="h-4 w-4 text-charcoal-400" />
                             {formatDate(o.bookingDate)}
                           </span>
                         )}
                         {o.bookingTime && (
                           <span className="inline-flex items-center gap-1.5">
-                            <Clock className="h-4 w-4 text-gray-500" />
+                            <Clock className="h-4 w-4 text-charcoal-400" />
                             {o.bookingTime}
                           </span>
                         )}
                         <span className="inline-flex items-center gap-1.5">
-                          <Users className="h-4 w-4 text-gray-500" />
+                          <Users className="h-4 w-4 text-charcoal-400" />
                           {o.numberOfGuests} {o.numberOfGuests === 1 ? 'guest' : 'guests'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-2">
-                        <p className="text-lg font-bold text-white">
-                          ${Number(o.totalAmount).toFixed(2)}
+                        <p className="text-lg font-bold text-ink">
+                          {formatPrice(o.totalAmount) ?? 'Free'}
                         </p>
-                        <span className="inline-flex items-center gap-1 text-sm text-primary-500 group-hover:text-primary-400">
+                        <span className="inline-flex items-center gap-1 text-sm font-medium text-whisky-700 transition-colors group-hover:text-whisky-600">
                           View ticket
                           <ArrowRight className="h-4 w-4" />
                         </span>

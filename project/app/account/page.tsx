@@ -135,8 +135,8 @@ export default function AccountPage() {
 
   if (authLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-charcoal-400" />
       </div>
     )
   }
@@ -144,24 +144,24 @@ export default function AccountPage() {
   const initials = `${profile.firstName[0] || ''}${profile.lastName[0] || ''}` || 'D'
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-cream">
       <Header />
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header card */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex items-center gap-5 mb-8">
-          <div className="w-16 h-16 rounded-full bg-primary-500 text-black flex items-center justify-center text-xl font-bold uppercase">
+        <div className="card p-6 flex items-center gap-5 mb-8">
+          <div className="w-16 h-16 rounded-full bg-whisky-500 text-white flex items-center justify-center text-xl font-bold uppercase shadow-gold">
             {initials}
           </div>
           <div>
-            <h1 className="text-2xl font-bold">My Account</h1>
-            <p className="text-sm text-gray-400 mt-0.5">
+            <h1 className="font-display text-2xl font-bold text-ink">My Account</h1>
+            <p className="text-sm text-charcoal-500 mt-0.5">
               {profile.firstName} {profile.lastName} · {profile.email}
             </p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-800">
+        <div className="flex gap-2 mb-6 border-b border-charcoal-200">
           <TabButton active={tab === 'profile'} onClick={() => setTab('profile')}>
             <UserIcon className="h-4 w-4" />
             Profile
@@ -175,13 +175,10 @@ export default function AccountPage() {
         {tab === 'profile' &&
           (profileLoading ? (
             <div className="py-12 flex justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+              <Loader2 className="h-6 w-6 animate-spin text-charcoal-400" />
             </div>
           ) : (
-            <form
-              onSubmit={handleProfileSave}
-              className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-5"
-            >
+            <form onSubmit={handleProfileSave} className="card p-6 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field
                   label="First name"
@@ -215,22 +212,21 @@ export default function AccountPage() {
               />
 
               {profileError && (
-                <div className="bg-red-900/30 border border-red-700 text-red-300 px-3 py-2 rounded-lg text-sm">
+                <div
+                  role="alert"
+                  className="rounded-xl border border-status-danger/25 bg-status-dangerSoft px-3 py-2 text-sm text-status-danger"
+                >
                   {profileError}
                 </div>
               )}
               {profileSaved && (
-                <div className="bg-green-900/30 border border-green-700 text-green-300 px-3 py-2 rounded-lg text-sm flex items-center gap-2">
+                <div className="flex items-center gap-2 rounded-xl border border-status-success/25 bg-status-successSoft px-3 py-2 text-sm text-status-success">
                   <CheckCircle2 className="h-4 w-4" />
                   Saved.
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={profileSaving}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-black font-semibold rounded-lg disabled:opacity-50"
-              >
+              <button type="submit" disabled={profileSaving} className="btn-primary px-5 py-2.5">
                 {profileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save changes
               </button>
@@ -238,10 +234,7 @@ export default function AccountPage() {
           ))}
 
         {tab === 'password' && (
-          <form
-            onSubmit={handlePasswordSave}
-            className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-5"
-          >
+          <form onSubmit={handlePasswordSave} className="card p-6 space-y-5">
             <PasswordField
               label="Current password"
               value={pw.currentPassword}
@@ -264,22 +257,21 @@ export default function AccountPage() {
             />
 
             {pwError && (
-              <div className="bg-red-900/30 border border-red-700 text-red-300 px-3 py-2 rounded-lg text-sm">
+              <div
+                role="alert"
+                className="rounded-xl border border-status-danger/25 bg-status-dangerSoft px-3 py-2 text-sm text-status-danger"
+              >
                 {pwError}
               </div>
             )}
             {pwSaved && (
-              <div className="bg-green-900/30 border border-green-700 text-green-300 px-3 py-2 rounded-lg text-sm flex items-center gap-2">
+              <div className="flex items-center gap-2 rounded-xl border border-status-success/25 bg-status-successSoft px-3 py-2 text-sm text-status-success">
                 <CheckCircle2 className="h-4 w-4" />
                 Password updated.
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={pwSaving}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-black font-semibold rounded-lg disabled:opacity-50"
-            >
+            <button type="submit" disabled={pwSaving} className="btn-primary px-5 py-2.5">
               {pwSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
               Update password
             </button>
@@ -303,8 +295,10 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${
-        active ? 'border-primary-500 text-primary-500' : 'border-transparent text-gray-400 hover:text-white'
+      className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 transition-colors ${
+        active
+          ? 'border-whisky-500 text-whisky-700'
+          : 'border-transparent text-charcoal-500 hover:text-ink'
       }`}
     >
       {children}
@@ -329,15 +323,15 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm text-gray-300 mb-1">{label}</label>
+      <label className="label">{label}</label>
       <div className="relative">
-        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
+        <Icon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
         <input
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-9 pr-3 py-2.5 bg-gray-800 text-white placeholder:text-gray-500 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          className="input-field pl-10"
         />
       </div>
     </div>
@@ -361,27 +355,28 @@ function PasswordField({
 }) {
   return (
     <div>
-      <label className="block text-sm text-gray-300 mb-1">{label}</label>
+      <label className="label">{label}</label>
       <div className="relative">
-        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
+        <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
         <input
           type={show ? 'text' : 'password'}
           required
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full pl-9 pr-9 py-2.5 bg-gray-800 text-white placeholder:text-gray-500 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          className="input-field pl-10 pr-11"
         />
         {onShow && (
           <button
             type="button"
             onClick={onShow}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-primary-500"
+            aria-label={show ? 'Hide password' : 'Show password'}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-charcoal-400 transition-colors hover:text-whisky-600"
           >
             {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         )}
       </div>
-      {hint && <p className="text-xs text-gray-500 mt-1">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-charcoal-500">{hint}</p>}
     </div>
   )
 }

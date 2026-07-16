@@ -50,7 +50,7 @@ export default function BarMenuPage() {
 
   return (
     <div className="space-y-6">
-      <AdminDetailNav id={id} type="bars" name={bar.name} />
+      <AdminDetailNav id={id} type="bars" name={bar.name} isActive={bar.isActive !== false} />
 
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="flex flex-col gap-4 border-b border-gray-200 p-6 sm:flex-row sm:items-center sm:justify-between">

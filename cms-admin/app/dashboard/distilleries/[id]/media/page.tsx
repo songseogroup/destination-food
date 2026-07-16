@@ -28,7 +28,7 @@ export default function DistilleryMediaPage() {
 
   return (
     <div className="space-y-6">
-      <AdminDetailNav id={id} type="distilleries" name={distillery.name} />
+      <AdminDetailNav id={id} type="distilleries" name={distillery.name} isActive={distillery.isActive !== false} />
       <ListingMediaManager
         entity={distillery}
         type="distilleries"

@@ -9,6 +9,13 @@ interface PageTransitionProps {
   children: React.ReactNode
 }
 
+/*
+ * NOTE: the `isLoading` overlay below is effectively dead code. It only flips on
+ * `beforeunload`/`popstate`, and neither fires on App Router client navigations —
+ * so the overlay never shows in practice. `router` here is likewise destructured
+ * but unused. Both are left as-is deliberately: this pass is a restyle only.
+ * Wire the overlay to `usePathname()` if the transition is ever wanted for real.
+ */
 export default function PageTransition({ children }: PageTransitionProps) {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -48,7 +55,7 @@ export default function PageTransition({ children }: PageTransitionProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center"
+            className="fixed inset-0 bg-cream/90 backdrop-blur-sm z-50 flex items-center justify-center"
           >
             <LoadingSpinner size="lg" text="Loading..." />
           </motion.div>

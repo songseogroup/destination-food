@@ -90,8 +90,13 @@ export interface Blog {
 
 export interface HomepageContent {
   id: number
+  /** Stable key: 'banner', 'featured_bars', … or 'ad:<slot>'. */
   section: string
   content: Record<string, any>
+  /** Render order on the public homepage, ascending. */
+  order: number
+  /** Hidden blocks keep their copy but are not rendered by the storefront. */
+  isVisible: boolean
   createdAt: string
   updatedAt: string
 }

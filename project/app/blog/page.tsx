@@ -2,11 +2,49 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { BookOpen, Clock, Martini, Newspaper, Search, User, Wine, X } from 'lucide-react'
 import Header from '../../components/Header'
 import Footer from '../../components/Footer'
+import SitePromoBand from '../../components/SitePromoBand'
+import ArticleCard, { ArticleCardSkeleton } from '../../components/ArticleCard'
+import { EmptyState } from '../../components/ui/Section'
 import { apiService } from '../../lib/api'
 import { Blog } from '../../lib/types'
-import LoadingSpinner from '../../components/LoadingSpinner'
+
+/**
+ * Browse shortcuts under the grid.
+ *
+ * These were food-delivery leftovers ("Pizza Guides", "Restaurant Reviews") with
+ * invented article counts — this is a whisky journal, and the counts were never
+ * real. Each topic now seeds the existing search filter instead of claiming a
+ * number we cannot substantiate from the loaded page of posts.
+ */
+const POPULAR_TOPICS = [
+  {
+    icon: Wine,
+    title: 'Tasting Notes',
+    description: 'Drams pulled apart, nose to finish',
+    query: 'tasting',
+  },
+  {
+    icon: Newspaper,
+    title: 'Distillery Stories',
+    description: 'The people and places behind the pour',
+    query: 'distillery',
+  },
+  {
+    icon: BookOpen,
+    title: 'Beginner Guides',
+    description: 'Start here if whisky is new to you',
+    query: 'guide',
+  },
+  {
+    icon: Martini,
+    title: 'Cocktails',
+    description: 'Whisky serves worth mixing at home',
+    query: 'cocktail',
+  },
+]
 
 export default function BlogPage() {
   const [blogPosts, setBlogPosts] = useState<Blog[]>([])
@@ -47,64 +85,79 @@ export default function BlogPage() {
   }, [currentPage])
 
   const filteredBlogs = blogPosts.filter((post) => {
-    const matchesSearch = 
+    const matchesSearch =
       post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       post.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
       post.category.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesCategory = selectedCategory === 'All' || post.category === selectedCategory
-    
+
     return matchesSearch && matchesCategory
   })
 
   const featuredPost = filteredBlogs.find(post => post.featured) || filteredBlogs[0]
   const regularPosts = filteredBlogs.filter(post => post.id !== featuredPost?.id)
+
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-cream">
       <Header />
-      <main className="bg-black">
+      <main className="bg-cream">
         {/* Hero Section */}
-        <section className="bg-gradient-to-r from-primary-500 to-primary-600 text-white py-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="border-b border-charcoal-200 bg-white py-16">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="text-center">
-              <h1 className="text-4xl md:text-5xl font-bold mb-4">
-                ByFoods Blog
+              <span className="pill-gold uppercase tracking-[0.2em]">The Journal</span>
+              <h1 className="section-title mt-5 text-4xl md:text-5xl">
+                Stories from the whisky world
               </h1>
-              <p className="text-xl text-black/80 max-w-2xl mx-auto">
-                Discover the latest in nightlife, spirits, events, and entertainment culture
+              <p className="section-subtitle mt-4">
+                Tasting notes, distillery visits, and guides to drinking better — written by the
+                people who pour.
               </p>
             </div>
           </div>
         </section>
 
         {/* Search and Filters */}
-        <section className="py-8 bg-gray-900 border-b border-gray-800">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+        {/* Site-wide promo — same campaign on every page. */}
+        <SitePromoBand className="py-12" />
+
+        <section className="border-b border-charcoal-200 bg-white/70 py-6">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col items-center justify-between gap-4 lg:flex-row">
               {/* Search */}
               <div className="relative w-full lg:w-96">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
                 <input
-                  type="text"
+                  type="search"
                   placeholder="Search articles..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  aria-label="Search articles"
+                  className="input-field rounded-full pl-11 pr-10"
                 />
-                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    aria-label="Clear search"
+                    className="absolute right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-charcoal-400 transition-colors hover:bg-charcoal-100 hover:text-ink"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
 
               {/* Categories */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
                 {categories.map((category) => (
                   <button
                     key={category}
                     onClick={() => setSelectedCategory(category)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                       category === selectedCategory
-                        ? 'bg-primary-500 text-black' 
-                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                        ? 'bg-whisky-500 text-white shadow-gold'
+                        : 'border border-charcoal-200 bg-white text-charcoal-600 hover:border-charcoal-300 hover:text-ink'
                     }`}
                   >
                     {category}
@@ -116,57 +169,60 @@ export default function BlogPage() {
         </section>
 
         {loading ? (
-          <div className="py-12 flex justify-center">
-            <LoadingSpinner />
-          </div>
+          <section className="py-12">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <ArticleCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+          </section>
         ) : (
           <>
-            {/* Featured Post */}
+            {/* Featured Post — a wide editorial panel rather than an ArticleCard,
+                which is deliberately a fixed 16/10 grid tile. */}
             {featuredPost && (
               <section className="py-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <Link href={`/blog/${featuredPost.id}`}>
-                    <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                  <Link href={`/blog/${featuredPost.id}`} className="group block">
+                    <article className="card-interactive overflow-hidden">
                       <div className="grid lg:grid-cols-2">
-                        <div className="relative h-64 lg:h-full">
-                          <img 
-                            src={featuredPost.image} 
-                            alt={featuredPost.title}
-                            className="w-full h-full object-cover"
+                        <div className="relative h-64 overflow-hidden bg-charcoal-100 lg:h-full">
+                          <img
+                            src={featuredPost.image}
+                            alt=""
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                           />
-                          <div className="absolute top-4 left-4">
-                            <span className="bg-primary-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                          <div className="absolute left-4 top-4">
+                            <span className="rounded-full bg-whisky-500 px-3 py-1 text-xs font-semibold text-white shadow-soft">
                               {featuredPost.featured ? 'Featured' : featuredPost.category}
                             </span>
                           </div>
                         </div>
-                        <div className="p-8 flex flex-col justify-center">
-                          <div className="mb-4">
-                            <span className="text-primary-600 font-semibold text-sm">
-                              {featuredPost.category}
-                            </span>
-                          </div>
-                          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+                        <div className="flex flex-col justify-center p-8">
+                          <span className="text-sm font-semibold text-whisky-700">
+                            {featuredPost.category}
+                          </span>
+                          <h2 className="mt-3 font-display text-2xl font-bold text-ink transition-colors group-hover:text-whisky-700 md:text-3xl">
                             {featuredPost.title}
                           </h2>
-                          <p className="text-gray-600 mb-6">
-                            {featuredPost.excerpt}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4 text-sm text-gray-500">
-                              <span>By {featuredPost.author}</span>
-                              <span>•</span>
-                              <span>{new Date(featuredPost.date).toLocaleDateString()}</span>
-                              <span>•</span>
-                              <span>{featuredPost.readTime}</span>
-                            </div>
-                            <span className="btn-primary">
-                              Read More
+                          <p className="mt-4 text-charcoal-600">{featuredPost.excerpt}</p>
+                          <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-charcoal-500">
+                            <span className="inline-flex items-center gap-1.5">
+                              <User className="h-4 w-4" strokeWidth={1.75} />
+                              {featuredPost.author}
                             </span>
+                            <span className="inline-flex items-center gap-1.5">
+                              <Clock className="h-4 w-4" strokeWidth={1.75} />
+                              {featuredPost.readTime}
+                            </span>
+                            <span>{new Date(featuredPost.date).toLocaleDateString()}</span>
                           </div>
+                          <span className="btn-primary mt-7 self-start">Read more</span>
                         </div>
                       </div>
-                    </div>
+                    </article>
                   </Link>
                 </div>
               </section>
@@ -174,127 +230,101 @@ export default function BlogPage() {
 
             {/* Blog Posts Grid */}
             <section className="py-12">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 {regularPosts.length > 0 ? (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                     {regularPosts.map((post) => (
-                      <Link key={post.id} href={`/blog/${post.id}`}>
-                        <article className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer">
-                          <div className="relative h-48">
-                            <img 
-                              src={post.image} 
-                              alt={post.title}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute top-4 left-4">
-                              <span className="bg-primary-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                                {post.category}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="p-6">
-                            <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2">
-                              {post.title}
-                            </h3>
-                            <p className="text-gray-600 mb-4 line-clamp-3">
-                              {post.excerpt}
-                            </p>
-                            
-                            <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                              <span>By {post.author}</span>
-                              <span>{new Date(post.date).toLocaleDateString()}</span>
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-500">
-                                {post.readTime}
-                              </span>
-                              <span className="text-primary-600 font-semibold hover:text-primary-700 transition-colors">
-                                Read More →
-                              </span>
-                            </div>
-                          </div>
-                        </article>
-                      </Link>
+                      <ArticleCard
+                        key={post.id}
+                        href={`/blog/${post.id}`}
+                        image={post.image}
+                        title={post.title}
+                        excerpt={post.excerpt}
+                        author={post.author}
+                        readTime={post.readTime}
+                        category={post.category}
+                        featured={post.featured}
+                      />
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500 text-lg">No blog posts found</p>
-                  </div>
+                  <EmptyState
+                    icon={<Newspaper className="mx-auto h-10 w-10" strokeWidth={1.5} />}
+                    title="No articles found"
+                    description={
+                      searchTerm || selectedCategory !== 'All'
+                        ? 'Try a different search or category.'
+                        : 'New stories are on the way — check back soon.'
+                    }
+                  />
                 )}
               </div>
             </section>
           </>
         )}
 
-
         {/* Newsletter Signup */}
-        <section className="py-16 bg-white">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Stay Updated
-            </h2>
-            <p className="text-lg text-gray-600 mb-8">
-              Subscribe to our newsletter for the latest food trends, restaurant guides, and exclusive content
+        <section className="border-y border-charcoal-200 bg-white py-16">
+          <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+            <h2 className="section-title">Stay Updated</h2>
+            <p className="mt-4 text-lg text-charcoal-600">
+              Subscribe for new tasting notes, distillery stories, and first word on tickets.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+            <div className="mx-auto mt-8 flex max-w-md flex-col gap-4 sm:flex-row">
               <input
                 type="email"
                 placeholder="Enter your email"
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                aria-label="Email address"
+                className="input-field flex-1 rounded-full"
               />
-              <button className="btn-primary whitespace-nowrap">
-                Subscribe
-              </button>
+              <button className="btn-primary whitespace-nowrap">Subscribe</button>
             </div>
           </div>
         </section>
 
         {/* Popular Topics */}
-        <section className="py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Popular Topics
-              </h2>
-              <p className="text-lg text-gray-600">
-                Explore our most-read content categories
-              </p>
+        <section className="py-16">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mb-10 text-center">
+              <h2 className="section-title">Popular Topics</h2>
+              <p className="section-subtitle mt-3">Explore the journal by what you feel like reading</p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[
-                { icon: '🍕', title: 'Pizza Guides', count: '12 articles' },
-                { icon: '🥗', title: 'Healthy Eating', count: '8 articles' },
-                { icon: '🌍', title: 'International Cuisine', count: '15 articles' },
-                { icon: '🏆', title: 'Restaurant Reviews', count: '20 articles' }
-              ].map((topic, index) => (
-                <div key={index} className="bg-white rounded-xl p-6 text-center shadow-lg hover:shadow-xl transition-shadow cursor-pointer">
-                  <div className="text-4xl mb-4">{topic.icon}</div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">
-                    {topic.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm">
-                    {topic.count}
-                  </p>
-                </div>
-              ))}
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              {POPULAR_TOPICS.map((topic) => {
+                const Icon = topic.icon
+                return (
+                  <button
+                    key={topic.title}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory('All')
+                      setSearchTerm(topic.query)
+                    }}
+                    className="card-interactive group p-6 text-center"
+                  >
+                    <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-whisky-100 text-whisky-600 transition-colors group-hover:bg-whisky-500 group-hover:text-white">
+                      <Icon className="h-5 w-5" strokeWidth={1.75} />
+                    </span>
+                    <h3 className="font-display text-lg font-bold text-ink">{topic.title}</h3>
+                    <p className="mt-1.5 text-sm text-charcoal-600">{topic.description}</p>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </section>
 
         {/* Pagination */}
         {!loading && totalPages > 1 && (
-          <section className="py-8 bg-white">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <section className="border-t border-charcoal-200 bg-white py-8">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <div className="flex justify-center">
-                <nav className="flex items-center space-x-2">
-                  <button 
+                <nav className="flex items-center gap-2">
+                  <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                    className="rounded-full px-3 py-2 text-sm font-medium text-charcoal-600 transition-colors hover:bg-charcoal-100 hover:text-ink disabled:opacity-50 disabled:hover:bg-transparent"
                   >
                     Previous
                   </button>
@@ -304,21 +334,22 @@ export default function BlogPage() {
                       <button
                         key={page}
                         onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-2 rounded-lg ${
+                        aria-current={currentPage === page ? 'page' : undefined}
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                           currentPage === page
-                            ? 'bg-primary-500 text-white'
-                            : 'text-gray-700 hover:bg-gray-100'
+                            ? 'bg-whisky-500 text-white'
+                            : 'text-charcoal-600 hover:bg-charcoal-100 hover:text-ink'
                         }`}
                       >
                         {page}
                       </button>
                     )
                   })}
-                  {totalPages > 5 && <span className="px-3 py-2 text-gray-500">...</span>}
-                  <button 
+                  {totalPages > 5 && <span className="px-2 py-2 text-charcoal-400">...</span>}
+                  <button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-2 text-gray-700 hover:text-gray-900 disabled:opacity-50"
+                    className="rounded-full px-3 py-2 text-sm font-medium text-charcoal-600 transition-colors hover:bg-charcoal-100 hover:text-ink disabled:opacity-50 disabled:hover:bg-transparent"
                   >
                     Next
                   </button>
@@ -331,4 +362,4 @@ export default function BlogPage() {
       <Footer />
     </div>
   )
-} 
+}

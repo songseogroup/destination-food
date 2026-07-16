@@ -28,7 +28,7 @@ export default function EventMediaPage() {
 
   return (
     <div className="space-y-6">
-      <AdminDetailNav id={id} type="events" name={event.name} />
+      <AdminDetailNav id={id} type="events" name={event.name} isActive={event.isActive !== false} />
       <ListingMediaManager
         entity={event}
         type="events"

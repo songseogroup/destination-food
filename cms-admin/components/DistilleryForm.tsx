@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { useMutation, useQueryClient } from 'react-query'
 import { Upload, Plus, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Distillery } from '@/lib/types'
+import { SocialLinksField, SocialLink, cleanSocialLinks } from '@/components/SocialLinksField'
 import toast from 'react-hot-toast'
 
 interface DistilleryFormProps {
@@ -26,11 +27,19 @@ interface DistilleryFormData {
   address: string
   phone: string
   website: string
+  socialLinks: SocialLink[]
   operatingHours: Record<string, string>
   products: string[]
   isOpen: boolean
   isActive: boolean
 }
+
+/**
+ * What actually goes over the wire. `website` is optional here because the
+ * backend's @IsOptional() only skips null/undefined — an empty string still
+ * reaches @IsUrl() and 400s the whole request, so we omit it instead.
+ */
+type DistillerySubmitData = Omit<DistilleryFormData, 'website'> & { website?: string }
 
 export function DistilleryForm({ distillery, onSuccess, onCancel }: DistilleryFormProps) {
   const [specialties, setSpecialties] = useState<string[]>(distillery?.specialties || [])
@@ -40,7 +49,7 @@ export function DistilleryForm({ distillery, onSuccess, onCancel }: DistilleryFo
   const [uploading, setUploading] = useState(false)
   const queryClient = useQueryClient()
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<DistilleryFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, watch, control } = useForm<DistilleryFormData>({
     defaultValues: {
       name: distillery?.name || '',
       type: distillery?.type || '',
@@ -52,6 +61,8 @@ export function DistilleryForm({ distillery, onSuccess, onCancel }: DistilleryFo
       address: distillery?.address || '',
       phone: distillery?.phone || '',
       website: distillery?.website || '',
+      // Not on the Distillery type in lib/types.ts yet, hence the cast.
+      socialLinks: ((distillery as any)?.socialLinks as SocialLink[]) ?? [],
       operatingHours: distillery?.operatingHours || {},
       isOpen: distillery?.isOpen || true,
       isActive: distillery?.isActive || true,
@@ -59,7 +70,7 @@ export function DistilleryForm({ distillery, onSuccess, onCancel }: DistilleryFo
   })
 
   const createMutation = useMutation(
-    (data: DistilleryFormData) => api.post('/distilleries', data),
+    (data: DistillerySubmitData) => api.post('/distilleries', data),
     {
       onSuccess: () => {
         queryClient.invalidateQueries('distilleries')
@@ -72,7 +83,7 @@ export function DistilleryForm({ distillery, onSuccess, onCancel }: DistilleryFo
   )
 
   const updateMutation = useMutation(
-    (data: DistilleryFormData) => api.patch(`/distilleries/${distillery?.id}`, data),
+    (data: DistillerySubmitData) => api.patch(`/distilleries/${distillery?.id}`, data),
     {
       onSuccess: () => {
         queryClient.invalidateQueries('distilleries')
@@ -128,10 +139,13 @@ export function DistilleryForm({ distillery, onSuccess, onCancel }: DistilleryFo
   }
 
   const onSubmit = (data: DistilleryFormData) => {
-    const submitData = {
+    const website = data.website?.trim()
+    const submitData: DistillerySubmitData = {
       ...data,
       specialties,
       products,
+      socialLinks: cleanSocialLinks(data.socialLinks),
+      website: website ? website : undefined,
     }
 
     if (distillery) {
@@ -385,6 +399,24 @@ export function DistilleryForm({ distillery, onSuccess, onCancel }: DistilleryFo
             placeholder="https://example.com"
           />
         </div>
+      </div>
+
+      {/* Social & Links */}
+      <div className="form-section space-y-4">
+        <div>
+          <h3 className="section-title">Social & Links</h3>
+          <p className="section-description">
+            Social profiles and any other pages worth linking. The website above stays the primary site.
+          </p>
+        </div>
+
+        <Controller
+          control={control}
+          name="socialLinks"
+          render={({ field }) => (
+            <SocialLinksField value={field.value ?? []} onChange={field.onChange} />
+          )}
+        />
       </div>
 
       {/* Form Actions */}

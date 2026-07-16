@@ -53,6 +53,14 @@ export const apiService = {
   // Customer Auth
   loginCustomer: (email: string, password: string) => api.post(`${endpoints.customers}/login`, { email, password }),
   signupCustomer: (data: any) => api.post(`${endpoints.customers}/signup`, data),
+  /**
+   * Exchanges a Google ID token for a Destination Whisky session. The backend
+   * verifies the token against Google's certs — the raw ID token is never
+   * trusted client-side. Handles both sign-in and sign-up: the backend creates
+   * the customer on first use.
+   */
+  googleAuthCustomer: (idToken: string) =>
+    api.post(`${endpoints.customers}/auth/google`, { idToken }),
   setAuthToken: (token: string) => {
     if (token) {
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`

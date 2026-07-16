@@ -1,19 +1,28 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Search, User, Menu, X, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react'
+import { Search, Menu, X, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCustomerAuth } from '../contexts/CustomerAuthContext'
 import NotificationsBell from './NotificationsBell'
+import Logo from './Logo'
+
+const NAV_LINKS = [
+  { href: '/bars', label: 'Whisky Bars' },
+  { href: '/distilleries', label: 'Distilleries' },
+  { href: '/events', label: 'Events' },
+  { href: '/blog', label: 'Journal' },
+]
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
   const { customer, isAuthenticated, logout } = useCustomerAuth()
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -24,90 +33,95 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  return (
-    <header className="bg-black border-b border-gray-800 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex items-center">
-            <Link href="/" className="text-2xl font-bold text-primary-500">
-              ByFoods
-            </Link>
-          </div>
+  // The search box previously stored keystrokes in state and did nothing with
+  // them — there was no form and no submit handler, so it was decorative.
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    const q = searchQuery.trim()
+    if (!q) return
+    setIsMenuOpen(false)
+    router.push(`/collections?q=${encodeURIComponent(q)}`)
+  }
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/bars" className="text-white hover:text-primary-500 transition-colors">
-              Bars
-            </Link>
-            <Link href="/distilleries" className="text-white hover:text-primary-500 transition-colors">
-              Distilleries
-            </Link>
-            <Link href="/events" className="text-white hover:text-primary-500 transition-colors">
-              Events
-            </Link>
-            <Link href="/blog" className="text-white hover:text-primary-500 transition-colors">
-              Blog
-            </Link>
+  return (
+    <header className="sticky top-0 z-50 border-b border-charcoal-800 bg-charcoal-900">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-[4.5rem] items-center justify-between gap-4">
+          <Logo className="shrink-0 text-whisky-400 transition-colors hover:text-whisky-300" />
+
+          <nav className="hidden items-center gap-7 md:flex">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-charcoal-200 transition-colors hover:text-whisky-400"
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
 
-          {/* Search Bar */}
-          <div className="hidden lg:flex items-center flex-1 max-w-md mx-8">
+          <form onSubmit={handleSearch} className="mx-4 hidden max-w-sm flex-1 lg:flex">
             <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
               <input
-                type="text"
-                placeholder="Search bars, distilleries, events..."
+                type="search"
+                placeholder="Search tastings, tours, bars..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                aria-label="Search whisky experiences"
+                className="w-full rounded-full border border-charcoal-700 bg-charcoal-800 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-charcoal-400 focus:border-whisky-500 focus:outline-none focus:ring-2 focus:ring-whisky-500/25"
               />
             </div>
-          </div>
+          </form>
 
-          {/* Right side actions */}
-          <div className="flex items-center space-x-3">
-            {/* Notifications bell — only renders when authenticated */}
+          <div className="flex items-center gap-2">
             <NotificationsBell />
 
-            {/* Auth Buttons or User Dropdown */}
             {isAuthenticated && customer ? (
-              /* Logged in - show user dropdown */
               <div className="relative hidden sm:block" ref={dropdownRef}>
                 <button
                   onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+                  aria-expanded={isUserDropdownOpen}
+                  aria-haspopup="menu"
+                  className="flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 text-charcoal-200 transition-colors hover:bg-charcoal-800 hover:text-white"
                 >
-                  <div className="w-7 h-7 bg-primary-500 rounded-full flex items-center justify-center text-black text-xs font-bold">
-                    {customer.firstName[0]}{customer.lastName[0]}
-                  </div>
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-whisky-500 text-xs font-bold text-white">
+                    {customer.firstName[0]}
+                    {customer.lastName[0]}
+                  </span>
                   <span className="text-sm font-medium">{customer.firstName}</span>
                   <ChevronDown className="h-4 w-4" />
                 </button>
 
                 {isUserDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-700 rounded-xl shadow-xl py-1 z-50">
-                    <div className="px-4 py-2 border-b border-gray-700">
-                      <p className="text-white text-sm font-medium">{customer.firstName} {customer.lastName}</p>
-                      <p className="text-gray-400 text-xs truncate">{customer.email}</p>
+                  <div className="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-charcoal-200 bg-white py-1 shadow-lifted">
+                    <div className="border-b border-charcoal-200 px-4 py-3">
+                      <p className="text-sm font-semibold text-ink">
+                        {customer.firstName} {customer.lastName}
+                      </p>
+                      <p className="truncate text-xs text-charcoal-500">{customer.email}</p>
                     </div>
                     <Link
                       href="/orders"
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+                      className="block px-4 py-2.5 text-sm text-charcoal-700 transition-colors hover:bg-charcoal-50 hover:text-ink"
                       onClick={() => setIsUserDropdownOpen(false)}
                     >
-                      My Orders
+                      My Bookings
                     </Link>
                     <Link
                       href="/account"
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+                      className="block px-4 py-2.5 text-sm text-charcoal-700 transition-colors hover:bg-charcoal-50 hover:text-ink"
                       onClick={() => setIsUserDropdownOpen(false)}
                     >
                       My Account
                     </Link>
                     <button
-                      onClick={() => { logout(); setIsUserDropdownOpen(false) }}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-gray-800 transition-colors"
+                      onClick={() => {
+                        logout()
+                        setIsUserDropdownOpen(false)
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-status-danger transition-colors hover:bg-charcoal-50"
                     >
                       <LogOut className="h-4 w-4" />
                       Sign Out
@@ -116,80 +130,89 @@ export default function Header() {
                 )}
               </div>
             ) : (
-              /* Not logged in - show Login / Sign Up buttons */
-              <div className="hidden sm:flex items-center gap-2">
+              <div className="hidden items-center gap-2 sm:flex">
                 <Link
                   href="/auth/login"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-300 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-charcoal-200 transition-colors hover:bg-charcoal-800 hover:text-white"
                 >
                   <LogIn className="h-4 w-4" />
-                  Login
+                  Log in
                 </Link>
                 <Link
                   href="/auth/signup"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-black bg-primary-500 hover:bg-primary-600 rounded-lg font-medium transition-colors"
+                  className="flex items-center gap-1.5 rounded-full bg-whisky-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-whisky-600"
                 >
                   <UserPlus className="h-4 w-4" />
-                  Sign Up
+                  Sign up
                 </Link>
               </div>
             )}
 
-            {/* Mobile menu button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 text-gray-400 hover:text-primary-500 transition-colors"
+              aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMenuOpen}
+              className="p-2 text-charcoal-300 transition-colors hover:text-whisky-400 md:hidden"
             >
               {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Search */}
-        <div className="lg:hidden pb-4">
+        <form onSubmit={handleSearch} className="pb-4 lg:hidden">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
             <input
-              type="text"
-              placeholder="Search bars, distilleries, events..."
+              type="search"
+              placeholder="Search tastings, tours, bars..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              aria-label="Search whisky experiences"
+              className="w-full rounded-full border border-charcoal-700 bg-charcoal-800 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-charcoal-400 focus:border-whisky-500 focus:outline-none focus:ring-2 focus:ring-whisky-500/25"
             />
           </div>
-        </div>
+        </form>
 
-        {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden pb-4 border-t border-gray-800">
-            <nav className="flex flex-col space-y-4 pt-4">
-              <Link href="/bars" className="text-white hover:text-primary-500 transition-colors" onClick={() => setIsMenuOpen(false)}>
-                Bars
-              </Link>
-              <Link href="/distilleries" className="text-white hover:text-primary-500 transition-colors" onClick={() => setIsMenuOpen(false)}>
-                Distilleries
-              </Link>
-              <Link href="/events" className="text-white hover:text-primary-500 transition-colors" onClick={() => setIsMenuOpen(false)}>
-                Events
-              </Link>
-              <Link href="/blog" className="text-white hover:text-primary-500 transition-colors" onClick={() => setIsMenuOpen(false)}>
-                Blog
-              </Link>
+          <div className="border-t border-charcoal-800 pb-4 md:hidden">
+            <nav className="flex flex-col gap-4 pt-4">
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-charcoal-200 transition-colors hover:text-whisky-400"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ))}
 
-              {/* Mobile Auth */}
-              <div className="pt-2 border-t border-gray-800">
+              <div className="border-t border-charcoal-800 pt-4">
                 {isAuthenticated && customer ? (
                   <>
-                    <p className="text-gray-400 text-sm mb-3">Signed in as <span className="text-white">{customer.firstName}</span></p>
-                    <Link href="/orders" className="block text-gray-300 hover:text-primary-500 transition-colors mb-3" onClick={() => setIsMenuOpen(false)}>
-                      My Orders
+                    <p className="mb-3 text-sm text-charcoal-400">
+                      Signed in as <span className="text-white">{customer.firstName}</span>
+                    </p>
+                    <Link
+                      href="/orders"
+                      className="mb-3 block text-charcoal-200 transition-colors hover:text-whisky-400"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      My Bookings
                     </Link>
-                    <Link href="/account" className="block text-gray-300 hover:text-primary-500 transition-colors mb-3" onClick={() => setIsMenuOpen(false)}>
+                    <Link
+                      href="/account"
+                      className="mb-3 block text-charcoal-200 transition-colors hover:text-whisky-400"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
                       My Account
                     </Link>
                     <button
-                      onClick={() => { logout(); setIsMenuOpen(false) }}
-                      className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors"
+                      onClick={() => {
+                        logout()
+                        setIsMenuOpen(false)
+                      }}
+                      className="flex items-center gap-2 text-status-danger transition-colors"
                     >
                       <LogOut className="h-4 w-4" />
                       Sign Out
@@ -199,19 +222,19 @@ export default function Header() {
                   <div className="flex flex-col gap-3">
                     <Link
                       href="/auth/login"
-                      className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
+                      className="flex items-center gap-2 text-charcoal-200 transition-colors hover:text-white"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       <LogIn className="h-4 w-4" />
-                      Login
+                      Log in
                     </Link>
                     <Link
                       href="/auth/signup"
-                      className="flex items-center gap-2 text-primary-500 hover:text-primary-400 transition-colors font-medium"
+                      className="flex items-center gap-2 font-medium text-whisky-400 transition-colors hover:text-whisky-300"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       <UserPlus className="h-4 w-4" />
-                      Sign Up
+                      Sign up
                     </Link>
                   </div>
                 )}
@@ -222,4 +245,4 @@ export default function Header() {
       </div>
     </header>
   )
-} 
+}

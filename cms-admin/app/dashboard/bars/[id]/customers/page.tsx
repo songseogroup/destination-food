@@ -45,7 +45,7 @@ export default function BarCustomersPage() {
 
   return (
     <div className="space-y-6">
-      <AdminDetailNav id={id} type="bars" name={bar.name} />
+      <AdminDetailNav id={id} type="bars" name={bar.name} isActive={bar.isActive !== false} />
 
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex justify-between items-center mb-6">

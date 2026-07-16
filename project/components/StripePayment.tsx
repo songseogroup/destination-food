@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { loadStripe, Stripe, StripeElementsOptions } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { api } from '@/lib/api'
+import { formatPrice } from '@/lib/format'
 
 // Lazy + cached. Calling loadStripe('') at module import time throws an
 // uncaught IntegrationError on every page that imports this component,
@@ -91,33 +92,35 @@ function PaymentForm({ orderId, amount, onSuccess, onError }: StripePaymentProps
     }
   }
 
+  // Colour-only update: the card input now sits on a white field, so the text
+  // is ink rather than white and the placeholder is charcoal-400.
   const cardElementOptions = {
     style: {
       base: {
         fontSize: '16px',
-        color: '#ffffff',
+        color: '#1A1614',
         '::placeholder': {
-          color: '#aab7c4',
+          color: '#A99E8F',
         },
       },
       invalid: {
-        color: '#fa755a',
-        iconColor: '#fa755a',
+        color: '#B4453A',
+        iconColor: '#B4453A',
       },
     },
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="bg-gray-800 p-4 rounded-lg">
+      <div className="rounded-xl border border-charcoal-200 bg-white p-4">
         <CardElement options={cardElementOptions} />
       </div>
       <button
         type="submit"
         disabled={!stripe || isProcessing || !clientSecret}
-        className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="btn-primary w-full"
       >
-        {isProcessing ? 'Processing...' : `Pay $${amount.toFixed(2)}`}
+        {isProcessing ? 'Processing...' : `Pay ${formatPrice(amount) ?? 'now'}`}
       </button>
     </form>
   )
@@ -130,23 +133,25 @@ export default function StripePayment({ orderId, amount, onSuccess, onError }: S
     // Friendlier UI than the raw Stripe IntegrationError. Means the
     // operator forgot to set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on Vercel.
     return (
-      <div className="bg-yellow-900/30 border border-yellow-700 text-yellow-200 px-4 py-3 rounded-lg text-sm">
+      <div className="rounded-xl border border-status-warning/25 bg-status-warningSoft px-4 py-3 text-sm text-status-warning">
         Online payments are temporarily unavailable. Please contact us to complete your booking, or try again later.
       </div>
     )
   }
 
+  // Colours only — the surrounding page is now the light Destination Whisky
+  // theme, so the 'night' theme rendered a black box on cream.
   const options: StripeElementsOptions = {
     appearance: {
-      theme: 'night',
+      theme: 'stripe',
       variables: {
-        colorPrimary: '#eab308',
-        colorBackground: '#1f2937',
-        colorText: '#ffffff',
-        colorDanger: '#ef4444',
+        colorPrimary: '#B8862F',
+        colorBackground: '#FFFFFF',
+        colorText: '#1A1614',
+        colorDanger: '#B4453A',
         fontFamily: 'system-ui, sans-serif',
         spacingUnit: '4px',
-        borderRadius: '8px',
+        borderRadius: '14px',
       },
     },
   }

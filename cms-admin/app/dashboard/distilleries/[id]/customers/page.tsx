@@ -44,7 +44,7 @@ export default function DistilleryCustomersPage() {
 
   return (
     <div className="space-y-6">
-      <AdminDetailNav id={id} type="distilleries" name={distillery.name} />
+      <AdminDetailNav id={id} type="distilleries" name={distillery.name} isActive={distillery.isActive !== false} />
 
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex justify-between items-center mb-6">

@@ -1,23 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { motion } from 'framer-motion'
-import { Plus, Search, Settings, Trash2, Eye, EyeOff, Star } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Eye, EyeOff, Star } from 'lucide-react'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
-import { isSuperAdmin } from '@/lib/roles'
+import { isPlatformRole } from '@/lib/roles'
 import { Event } from '@/lib/types'
+import { EventForm } from '@/components/EventForm'
+import { Modal } from '@/components/Modal'
 import toast from 'react-hot-toast'
 
 export default function EventsPage() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const router = useRouter()
   const queryClient = useQueryClient()
-  const canCreate = isSuperAdmin(auth.getUser()?.role)
+  // Platform staff (admin + super_admin) can create listings. This was
+  // isSuperAdmin only, which paired with the backend's @Roles(ADMIN, ...) —
+  // that omitted SUPER_ADMIN — meant nobody could actually create one.
+  const canCreate = isPlatformRole(auth.getUser()?.role)
 
   const { data: eventsData, isLoading } = useQuery(
     ['events', currentPage, searchTerm],
@@ -88,8 +92,20 @@ export default function EventsPage() {
     toggleFeaturedMutation.mutate({ id: event.id, isFeatured: event.isFeatured })
   }
 
-  const handleCreateNew = () => {
-    router.push('/dashboard/events/new')
+  const handleEdit = (event: Event) => {
+    setEditingEvent(event)
+    setShowForm(true)
+  }
+
+  const handleFormClose = () => {
+    setShowForm(false)
+    setEditingEvent(null)
+  }
+
+  const handleFormSuccess = () => {
+    queryClient.invalidateQueries('events')
+    handleFormClose()
+    toast.success(editingEvent ? 'Event updated successfully' : 'Event created successfully')
   }
 
   const formatDate = (dateString: string) => {
@@ -110,7 +126,7 @@ export default function EventsPage() {
         </div>
         {canCreate && (
           <button
-            onClick={handleCreateNew}
+            onClick={() => setShowForm(true)}
             className="btn-primary"
           >
             <Plus className="h-5 w-5 mr-2" />
@@ -219,13 +235,13 @@ export default function EventsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        <Link
-                          href={`/dashboard/events/${event.id}`}
+                        <button
+                          onClick={() => handleEdit(event)}
                           className="text-primary-600 hover:text-primary-900"
                           title="Edit event details"
                         >
-                          <Settings className="h-4 w-4" />
-                        </Link>
+                          <Edit className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleToggleFeatured(event)}
                           className={`${event.isFeatured ? 'text-yellow-600' : 'text-gray-400'} hover:text-yellow-600`}
@@ -281,6 +297,20 @@ export default function EventsPage() {
           </div>
         )}
       </div>
+
+      {/* Event Form Modal */}
+      <Modal
+        isOpen={showForm}
+        onClose={handleFormClose}
+        title={editingEvent ? 'Edit Event' : 'Add New Event'}
+        size="xl"
+      >
+        <EventForm
+          event={editingEvent}
+          onSuccess={handleFormSuccess}
+          onCancel={handleFormClose}
+        />
+      </Modal>
     </div>
   )
 }

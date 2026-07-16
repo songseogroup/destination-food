@@ -28,7 +28,7 @@ export default function BarMediaPage() {
 
   return (
     <div className="space-y-6">
-      <AdminDetailNav id={id} type="bars" name={bar.name} />
+      <AdminDetailNav id={id} type="bars" name={bar.name} isActive={bar.isActive !== false} />
       <ListingMediaManager
         entity={bar}
         type="bars"

@@ -27,7 +27,7 @@ export default function DistilleryDetailPage() {
 
   return (
     <div className="space-y-6">
-      <AdminDetailNav id={id} type="distilleries" name={distillery.name} />
+      <AdminDetailNav id={id} type="distilleries" name={distillery.name} isActive={distillery.isActive !== false} />
       
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Edit Distillery Details</h2>

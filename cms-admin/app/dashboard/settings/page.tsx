@@ -311,7 +311,7 @@ export default function SettingsPage() {
                     className="input-field pl-9"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="newuser@byfoods.com"
+                    placeholder="newuser@destinationwhisky.life"
                     required
                   />
                 </div>

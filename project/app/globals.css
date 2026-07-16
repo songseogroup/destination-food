@@ -1,4 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap');
+/*
+ * Fonts are loaded via next/font in app/layout.tsx (--font-inter, --font-display).
+ * The previous @import here re-fetched Inter over a render-blocking request on top
+ * of next/font's copy, and pulled in Poppins which nothing ever used.
+ */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,50 +13,137 @@
   }
 
   body {
-    font-family: 'Inter', system-ui, sans-serif;
-    @apply bg-black text-white;
+    @apply bg-cream text-ink antialiased;
+    font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
   }
 
   /*
-   * Default form-control styling.
-   *
-   * The body sets color:white for the dark homepage theme, but unstyled
-   * inputs would inherit that and become invisible on light-themed cards
-   * (bg-white). Set sensible defaults here. Any page that wants a dark
-   * input can override via Tailwind utilities (e.g. bg-gray-800 text-white)
-   * — those win on specificity.
+   * The old dark theme forced color:white on body, so every input needed an
+   * explicit light override to stay legible. On a light body they inherit
+   * correctly and that hack is gone — this is just the shared field look.
    */
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='submit']):not([type='button']),
   textarea,
   select {
-    @apply text-gray-900 bg-white;
+    @apply text-ink bg-white;
   }
 
   input::placeholder,
   textarea::placeholder {
-    @apply text-gray-400;
+    @apply text-charcoal-400;
+  }
+
+  ::selection {
+    @apply bg-whisky-200 text-ink;
   }
 }
 
 @layer components {
+  /* ---------- Buttons ---------- */
+  /*
+   * No hover:scale here. The old buttons used hover:scale-105, which is what
+   * read as "bouncy/basic" — soft marketplaces lift with shadow + tone, not size.
+   */
   .btn-primary {
-    @apply bg-primary-500 hover:bg-primary-600 text-black font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-whisky-500 px-6 py-3
+           font-semibold text-white shadow-gold transition-colors duration-200
+           hover:bg-whisky-600 focus-visible:outline focus-visible:outline-2
+           focus-visible:outline-offset-2 focus-visible:outline-whisky-500
+           disabled:cursor-not-allowed disabled:opacity-50;
   }
-  
+
   .btn-secondary {
-    @apply bg-transparent hover:bg-primary-500 text-primary-500 hover:text-black font-semibold py-3 px-6 rounded-lg border-2 border-primary-500 transition-all duration-200 transform hover:scale-105;
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-charcoal-300
+           bg-white px-6 py-3 font-semibold text-ink transition-colors duration-200
+           hover:border-charcoal-900 hover:bg-charcoal-50 focus-visible:outline
+           focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-whisky-500
+           disabled:cursor-not-allowed disabled:opacity-50;
   }
-  
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 font-medium
+           text-charcoal-600 transition-colors duration-200 hover:bg-charcoal-100 hover:text-ink;
+  }
+
+  /* ---------- Surfaces ---------- */
   .card {
-    @apply bg-gray-900 rounded-xl shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:-translate-y-1;
+    @apply rounded-2xl border border-charcoal-200 bg-white shadow-card;
   }
-  
-  .gradient-bg {
-    @apply bg-gradient-to-br from-primary-400 via-primary-500 to-primary-600;
+
+  .card-interactive {
+    @apply rounded-2xl border border-charcoal-200 bg-white shadow-card transition-all duration-300
+           hover:-translate-y-1 hover:border-charcoal-300 hover:shadow-card-hover;
   }
-  
+
+  .surface-dark {
+    @apply bg-charcoal-900 text-charcoal-100;
+  }
+
+  /* ---------- Pills & badges ---------- */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-charcoal-100 px-3 py-1
+           text-xs font-medium text-charcoal-600;
+  }
+
+  .pill-gold {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-whisky-100 px-3 py-1
+           text-xs font-semibold text-whisky-700;
+  }
+
+  .pill-open {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-status-successSoft px-3 py-1
+           text-xs font-semibold text-status-success;
+  }
+
+  .pill-closed {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-status-dangerSoft px-3 py-1
+           text-xs font-semibold text-status-danger;
+  }
+
+  /* ---------- Forms ---------- */
+  .input-field {
+    @apply w-full rounded-xl border border-charcoal-200 bg-white px-4 py-3 text-ink
+           transition-colors placeholder:text-charcoal-400 focus:border-whisky-500
+           focus:outline-none focus:ring-2 focus:ring-whisky-500/20;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-charcoal-700;
+  }
+
+  /* ---------- Typography ---------- */
+  .section-title {
+    @apply font-display text-3xl font-bold tracking-tight text-ink md:text-4xl;
+  }
+
+  .section-subtitle {
+    @apply mx-auto max-w-2xl text-lg text-charcoal-600;
+  }
+
   .text-gradient {
-    @apply bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-whisky-600 to-whisky-400 bg-clip-text text-transparent;
+  }
+
+  .gradient-bg {
+    @apply bg-gradient-to-br from-whisky-400 via-whisky-500 to-whisky-600;
+  }
+
+  /* ---------- Loading ---------- */
+  .skeleton {
+    @apply animate-shimmer rounded-xl bg-charcoal-100;
+    background-image: linear-gradient(
+      90deg,
+      theme('colors.charcoal.100') 0px,
+      theme('colors.charcoal.200') 40px,
+      theme('colors.charcoal.100') 80px
+    );
+    background-size: 800px 100%;
   }
 }
 
@@ -61,8 +152,16 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
+
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-} 
+
+  /* Clamp card titles to 2 lines so ragged names don't break grid alignment. */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}

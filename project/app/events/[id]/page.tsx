@@ -3,13 +3,16 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Star, MapPin, Clock, Calendar, Share2, Heart, Users, Ticket, Camera, Music, X } from 'lucide-react'
+import { MapPin, Clock, Calendar, Share2, Heart, Users, X } from 'lucide-react'
 import Header from '../../../components/Header'
 import Footer from '../../../components/Footer'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import StripePayment from '../../../components/StripePayment'
 import ReviewsSection from '../../../components/ReviewsSection'
+import { EmptyState } from '../../../components/ui/Section'
+import { formatPrice, formatEventDate, formatEventTime } from '../../../lib/format'
 import { apiService, api } from '../../../lib/api'
+import { trackView } from '../../../lib/analytics'
 import { Event } from '../../../lib/types'
 
 
@@ -41,6 +44,8 @@ export default function EventDetailPage() {
         setLoading(true)
         const response = await apiService.getEvent(Number(id))
         setEvent(response.data)
+        // Record the view once the real id is known — fire-and-forget.
+        if (response.data?.id) trackView('event', response.data.id)
       } catch (error) {
         console.error('Error fetching event:', error)
       } finally {
@@ -55,7 +60,7 @@ export default function EventDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-cream flex items-center justify-center">
         <LoadingSpinner />
       </div>
     )
@@ -63,12 +68,15 @@ export default function EventDetailPage() {
 
   if (!event) {
     return (
-      <div className="min-h-screen bg-black">
+      <div className="min-h-screen bg-cream">
         <Header />
-        <main className="bg-black py-12">
+        <main className="bg-cream py-12">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-2xl font-bold text-white mb-4">Event Not Found</h1>
-            <button onClick={() => router.push('/events')} className="text-primary-500 hover:text-primary-600">
+            <h1 className="font-display text-2xl font-bold text-ink mb-4">Event Not Found</h1>
+            <button
+              onClick={() => router.push('/events')}
+              className="font-semibold text-whisky-700 transition-colors hover:text-whisky-600"
+            >
               ← Back to Events
             </button>
           </div>
@@ -113,6 +121,11 @@ export default function EventDetailPage() {
   const bookingFeeTotal = bookingFeePerTicket * ticketQuantity
   const totalCharge = totalPrice + bookingFeeTotal
 
+  // `price` is a bare varchar like "89" — never render it raw.
+  const displayPrice = formatPrice(event.price) ?? 'Free'
+  const eventDate = formatEventDate(eventDetails.date)
+  const eventTime = formatEventTime(eventDetails.time)
+
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -155,73 +168,96 @@ export default function EventDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-cream text-ink">
       <Header />
-      
+
       <main>
-        {/* Hero Section */}
-        <section className="relative h-96 overflow-hidden">
-          <div 
+        {/* Hero image */}
+        <section className="relative h-80 overflow-hidden md:h-96">
+          <div
             className="w-full h-full bg-cover bg-center"
             style={{ backgroundImage: `url(${eventDetails.images[selectedImage]})` }}
           >
-            <div className="absolute inset-0 bg-black/50"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-ink/50 via-ink/10 to-transparent"></div>
           </div>
-          
-          <div className="absolute inset-0 flex items-end">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 w-full">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <span className="px-3 py-1 bg-primary-500 text-black text-sm rounded-full font-semibold">
-                      {eventDetails.category}
-                    </span>
-                    <span className="px-3 py-1 bg-white/20 text-white text-sm rounded-full">
-                      {eventDetails.type}
-                    </span>
-                  </div>
-                  <h1 className="text-4xl md:text-5xl font-bold mb-2">{eventDetails.name}</h1>
-                  <p className="text-xl text-gray-300">{eventDetails.location}</p>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <button
-                    onClick={() => setIsFavorite(!isFavorite)}
-                    className={`p-3 rounded-full transition-colors ${
-                      isFavorite ? 'bg-red-500 text-white' : 'bg-white/20 text-white hover:bg-white/30'
-                    }`}
-                  >
-                    <Heart className={`w-6 h-6 ${isFavorite ? 'fill-current' : ''}`} />
-                  </button>
-                  <button className="p-3 bg-white/20 text-white rounded-full hover:bg-white/30 transition-colors">
-                    <Share2 className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
+
+          <div className="absolute right-4 top-4 flex items-center gap-3 sm:right-6 lg:right-8">
+            <button
+              onClick={() => setIsFavorite(!isFavorite)}
+              aria-label={isFavorite ? 'Remove from favourites' : 'Add to favourites'}
+              aria-pressed={isFavorite}
+              className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-charcoal-600 shadow-soft backdrop-blur transition-colors hover:bg-white hover:text-whisky-600"
+            >
+              <Heart className={`h-5 w-5 ${isFavorite ? 'fill-whisky-500 text-whisky-500' : ''}`} />
+            </button>
+            <button
+              aria-label="Share this event"
+              className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-charcoal-600 shadow-soft backdrop-blur transition-colors hover:bg-white hover:text-whisky-600"
+            >
+              <Share2 className="h-5 w-5" />
+            </button>
+          </div>
+        </section>
+
+        {/* Title block. Events carry no rating column, so there is no stars row here. */}
+        <section className="border-b border-charcoal-200 bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="pill-gold">{eventDetails.category}</span>
+              <span className="pill">{eventDetails.type}</span>
+            </div>
+
+            <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-ink md:text-5xl">
+              {eventDetails.name}
+            </h1>
+
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-charcoal-600">
+              <span className="flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                {eventDetails.location}
+              </span>
+              {eventDate && (
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                  {eventDate}
+                </span>
+              )}
+              {eventTime && (
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                  {eventTime}
+                </span>
+              )}
+              <span className="font-semibold text-whisky-700">{displayPrice}</span>
             </div>
           </div>
         </section>
 
         {/* Image Gallery */}
-        <section className="py-8 bg-gray-900">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {eventDetails.images.map((image, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedImage(index)}
-                  className={`relative h-24 rounded-lg overflow-hidden transition-all ${
-                    selectedImage === index ? 'ring-2 ring-primary-500' : 'hover:opacity-80'
-                  }`}
-                >
-                  <div 
-                    className="w-full h-full bg-cover bg-center"
-                    style={{ backgroundImage: `url(${image})` }}
-                  />
-                </button>
-              ))}
+        {eventDetails.images.length > 1 && (
+          <section className="bg-cream py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {eventDetails.images.map((image, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedImage(index)}
+                    className={`relative h-24 overflow-hidden rounded-xl transition-all ${
+                      selectedImage === index
+                        ? 'ring-2 ring-whisky-500 ring-offset-2 ring-offset-cream'
+                        : 'hover:opacity-80'
+                    }`}
+                  >
+                    <div
+                      className="w-full h-full bg-cover bg-center"
+                      style={{ backgroundImage: `url(${image})` }}
+                    />
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Main Content */}
         <section className="py-12">
@@ -230,16 +266,16 @@ export default function EventDetailPage() {
               {/* Left Column - Main Info */}
               <div className="lg:col-span-2">
                 {/* Tabs */}
-                <div className="mb-8">
-                  <div className="flex space-x-1 bg-gray-900 p-1 rounded-lg">
+                <div className="mb-8 border-b border-charcoal-200">
+                  <div className="-mb-px flex gap-6 overflow-x-auto scrollbar-hide">
                     {tabs.map((tab) => (
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                        className={`whitespace-nowrap border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
                           activeTab === tab.id
-                            ? 'bg-primary-500 text-black'
-                            : 'text-gray-400 hover:text-white'
+                            ? 'border-whisky-500 text-whisky-700'
+                            : 'border-transparent text-charcoal-500 hover:text-ink'
                         }`}
                       >
                         {tab.label}
@@ -256,45 +292,55 @@ export default function EventDetailPage() {
                     className="space-y-8"
                   >
                     <div>
-                      <h2 className="text-2xl font-bold mb-4">About This Event</h2>
-                      <p className="text-gray-300 leading-relaxed mb-6">{eventDetails.description}</p>
+                      <h2 className="font-display text-2xl font-bold text-ink mb-4">About This Event</h2>
+                      <p className="leading-relaxed text-charcoal-600">{eventDetails.description}</p>
                     </div>
 
-                    <div>
-                      <h3 className="text-xl font-semibold mb-4">Event Highlights</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {eventDetails.highlights.map((highlight, index) => (
-                          <div key={index} className="flex items-center space-x-3">
-                            <div className="w-2 h-2 bg-primary-500 rounded-full"></div>
-                            <span className="text-gray-300">{highlight}</span>
-                          </div>
-                        ))}
+                    {eventDetails.highlights.length > 0 && (
+                      <div>
+                        <h3 className="font-display text-xl font-semibold text-ink mb-4">
+                          Event Highlights
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {eventDetails.highlights.map((highlight, index) => (
+                            <div key={index} className="flex items-center space-x-3">
+                              <div className="h-2 w-2 shrink-0 rounded-full bg-whisky-500"></div>
+                              <span className="text-charcoal-600">{highlight}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div>
-                      <h3 className="text-xl font-semibold mb-4">What's Included</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {eventDetails.includes.map((item, index) => (
-                          <div key={index} className="flex items-center space-x-3">
-                            <div className="w-2 h-2 bg-primary-500 rounded-full"></div>
-                            <span className="text-gray-300">{item}</span>
-                          </div>
-                        ))}
+                    {eventDetails.includes.length > 0 && (
+                      <div>
+                        <h3 className="font-display text-xl font-semibold text-ink mb-4">
+                          What&apos;s Included
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {eventDetails.includes.map((item, index) => (
+                            <div key={index} className="flex items-center space-x-3">
+                              <div className="h-2 w-2 shrink-0 rounded-full bg-whisky-500"></div>
+                              <span className="text-charcoal-600">{item}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div>
-                      <h3 className="text-xl font-semibold mb-4">Requirements</h3>
-                      <div className="space-y-2">
-                        {eventDetails.requirements.map((requirement, index) => (
-                          <div key={index} className="flex items-center space-x-3">
-                            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                            <span className="text-gray-300">{requirement}</span>
-                          </div>
-                        ))}
+                    {eventDetails.requirements.length > 0 && (
+                      <div>
+                        <h3 className="font-display text-xl font-semibold text-ink mb-4">Requirements</h3>
+                        <div className="space-y-2">
+                          {eventDetails.requirements.map((requirement, index) => (
+                            <div key={index} className="flex items-center space-x-3">
+                              <div className="h-2 w-2 shrink-0 rounded-full bg-status-warning"></div>
+                              <span className="text-charcoal-600">{requirement}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </motion.div>
                 )}
 
@@ -304,19 +350,24 @@ export default function EventDetailPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-6"
                   >
-                    <h2 className="text-2xl font-bold mb-6">Event Agenda</h2>
-                    <div className="space-y-4">
-                      {eventDetails.agenda.map((item, index) => (
-                        <div key={index} className="flex items-center space-x-4 bg-gray-900 p-4 rounded-lg">
-                          <div className="flex-shrink-0 w-20 text-primary-500 font-semibold">
-                            {item.time}
+                    <h2 className="font-display text-2xl font-bold text-ink mb-6">Event Agenda</h2>
+                    {eventDetails.agenda.length > 0 ? (
+                      <div className="space-y-4">
+                        {eventDetails.agenda.map((item, index) => (
+                          <div key={index} className="card flex items-center space-x-4 p-4">
+                            <div className="w-20 flex-shrink-0 font-semibold text-whisky-700">
+                              {item.time}
+                            </div>
+                            <div className="flex-1 text-charcoal-600">{item.activity}</div>
                           </div>
-                          <div className="flex-1 text-gray-300">
-                            {item.activity}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        title="Agenda coming soon"
+                        description="The organiser hasn't published a running order for this event yet."
+                      />
+                    )}
                   </motion.div>
                 )}
 
@@ -336,8 +387,8 @@ export default function EventDetailPage() {
                     className="grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     {eventDetails.images.map((image, index) => (
-                      <div key={index} className="relative h-64 rounded-lg overflow-hidden">
-                        <div 
+                      <div key={index} className="relative h-64 overflow-hidden rounded-2xl">
+                        <div
                           className="w-full h-full bg-cover bg-center hover:scale-105 transition-transform duration-300"
                           style={{ backgroundImage: `url(${image})` }}
                         />
@@ -350,112 +401,106 @@ export default function EventDetailPage() {
               {/* Right Column - Booking Sidebar */}
               <div className="space-y-6">
                 {/* Booking Card */}
-                <div className="bg-gray-900 p-6 rounded-lg sticky top-24">
+                <div className="card sticky top-24 p-6">
                   <div className="text-center mb-6">
-                    <div className="text-3xl font-bold text-primary-500 mb-2">{eventDetails.price}</div>
-                    <div className="text-gray-400">per person</div>
+                    <div className="font-display text-3xl font-bold text-ink">{displayPrice}</div>
+                    <div className="text-sm text-charcoal-500">per person</div>
                   </div>
 
                   <div className="space-y-4 mb-6">
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Available Spots:</span>
-                      <span className="text-white font-semibold">{eventDetails.availableSpots} of {eventDetails.capacity}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Date:</span>
-                      <span className="text-white font-semibold">
-                        {new Date(eventDetails.date).toLocaleDateString('en-US', { 
-                          weekday: 'long', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })}
+                      <span className="text-charcoal-500">Available Spots:</span>
+                      <span className="font-semibold text-ink">
+                        {eventDetails.availableSpots} of {eventDetails.capacity}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Time:</span>
-                      <span className="text-white font-semibold">{eventDetails.time}</span>
+                      <span className="text-charcoal-500">Date:</span>
+                      <span className="font-semibold text-ink">{eventDate}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Duration:</span>
-                      <span className="text-white font-semibold">{eventDetails.duration}</span>
+                      <span className="text-charcoal-500">Time:</span>
+                      <span className="font-semibold text-ink">{eventTime}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-charcoal-500">Duration:</span>
+                      <span className="font-semibold text-ink">{eventDetails.duration}</span>
                     </div>
                   </div>
 
                   <div className="mb-6">
-                    <label className="block text-gray-400 text-sm mb-2">Number of Tickets</label>
+                    <label className="label">Number of Tickets</label>
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setTicketQuantity(Math.max(1, ticketQuantity - 1))}
-                        className="w-8 h-8 bg-gray-800 text-white rounded-full flex items-center justify-center hover:bg-gray-700"
+                        aria-label="Decrease ticket quantity"
+                        className="grid h-9 w-9 place-items-center rounded-full border border-charcoal-300 bg-white text-ink transition-colors hover:bg-charcoal-50"
                       >
                         -
                       </button>
-                      <span className="text-white font-semibold w-8 text-center">{ticketQuantity}</span>
+                      <span className="w-8 text-center font-semibold text-ink">{ticketQuantity}</span>
                       <button
                         onClick={() => setTicketQuantity(Math.min(eventDetails.availableSpots, ticketQuantity + 1))}
-                        className="w-8 h-8 bg-gray-800 text-white rounded-full flex items-center justify-center hover:bg-gray-700"
+                        aria-label="Increase ticket quantity"
+                        className="grid h-9 w-9 place-items-center rounded-full border border-charcoal-300 bg-white text-ink transition-colors hover:bg-charcoal-50"
                       >
                         +
                       </button>
                     </div>
                   </div>
 
-                  <div className="border-t border-gray-700 pt-4 mb-6 space-y-2">
+                  <div className="mb-6 space-y-2 border-t border-charcoal-200 pt-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Tickets:</span>
-                      <span className="text-white font-semibold">${totalPrice}</span>
+                      <span className="text-charcoal-500">Tickets:</span>
+                      <span className="font-semibold text-ink">{formatPrice(totalPrice) ?? 'Free'}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Booking Fee:</span>
-                      <span className="text-white font-semibold">${bookingFeeTotal}</span>
+                      <span className="text-charcoal-500">Booking Fee:</span>
+                      <span className="font-semibold text-ink">{formatPrice(bookingFeeTotal)}</span>
                     </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-800">
-                      <span className="text-gray-400">Total:</span>
-                      <span className="text-2xl font-bold text-primary-500">${totalCharge}</span>
+                    <div className="flex justify-between items-center border-t border-charcoal-200 pt-2">
+                      <span className="text-charcoal-500">Total:</span>
+                      <span className="font-display text-2xl font-bold text-whisky-700">
+                        {formatPrice(totalCharge)}
+                      </span>
                     </div>
                   </div>
 
-                  <button 
-                    onClick={() => setShowBookingModal(true)}
-                    className="w-full bg-primary-500 hover:bg-primary-600 text-black font-semibold py-3 px-4 rounded-lg transition-colors mb-4"
-                  >
+                  <button onClick={() => setShowBookingModal(true)} className="btn-primary mb-3 w-full">
                     Book Now
                   </button>
 
-                  <button className="w-full bg-transparent border border-primary-500 text-primary-500 hover:bg-primary-500 hover:text-black font-semibold py-2 px-4 rounded-lg transition-colors">
-                    Add to Calendar
-                  </button>
+                  <button className="btn-secondary w-full">Add to Calendar</button>
                 </div>
 
                 {/* Event Info */}
-                <div className="bg-gray-900 p-6 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-4">Event Information</h3>
+                <div className="card p-6">
+                  <h3 className="font-display text-lg font-semibold text-ink mb-4">Event Information</h3>
                   <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <MapPin className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-300">{eventDetails.address}</span>
+                    <div className="flex items-start space-x-3">
+                      <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-charcoal-400" strokeWidth={1.75} />
+                      <span className="text-charcoal-600">{eventDetails.address}</span>
                     </div>
                     <div className="flex items-center space-x-3">
-                      {/* <Phone className="w-5 h-5 text-gray-400" /> */}
-                      <span className="text-gray-300">{eventDetails.phone}</span>
+                      <span className="text-charcoal-600">{eventDetails.phone}</span>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <Users className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-300">{eventDetails.capacity} max capacity</span>
+                      <Users className="h-5 w-5 shrink-0 text-charcoal-400" strokeWidth={1.75} />
+                      <span className="text-charcoal-600">{eventDetails.capacity} max capacity</span>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <Calendar className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-300">{eventDetails.duration}</span>
+                      <Calendar className="h-5 w-5 shrink-0 text-charcoal-400" strokeWidth={1.75} />
+                      <span className="text-charcoal-600">{eventDetails.duration}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Organizer Info */}
-                <div className="bg-gray-900 p-6 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-4">Organizer</h3>
+                <div className="card p-6">
+                  <h3 className="font-display text-lg font-semibold text-ink mb-4">Organizer</h3>
                   <div className="space-y-2">
-                    <p className="text-white font-medium">{eventDetails.organizer}</p>
-                    <p className="text-gray-400 text-sm">{eventDetails.organizerEmail}</p>
+                    <p className="font-medium text-ink">{eventDetails.organizer}</p>
+                    <p className="text-sm text-charcoal-500">{eventDetails.organizerEmail}</p>
                   </div>
                 </div>
               </div>
@@ -468,38 +513,41 @@ export default function EventDetailPage() {
 
       {/* Booking Modal */}
       {showBookingModal && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-ink/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-900 rounded-lg max-w-md w-full p-6 relative"
+            className="card max-w-md w-full p-6 relative max-h-[90vh] overflow-y-auto"
           >
             <button
               onClick={() => setShowBookingModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              aria-label="Close"
+              className="absolute top-4 right-4 text-charcoal-400 transition-colors hover:text-ink"
             >
               <X className="w-6 h-6" />
             </button>
 
-            <h2 className="text-2xl font-bold mb-4">
+            <h2 className="font-display text-2xl font-bold text-ink mb-1">
               {showPayment ? 'Complete Payment' : 'Book Event'}
             </h2>
-            <p className="text-gray-400 mb-6">{eventDetails.name}</p>
+            <p className="text-charcoal-500 mb-5">{eventDetails.name}</p>
 
             {showPayment && createdOrderId ? (
               <div className="space-y-4">
-                <div className="bg-gray-800 p-4 rounded-lg space-y-2">
+                <div className="space-y-2 rounded-xl border border-charcoal-200 bg-charcoal-50 p-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Tickets:</span>
-                    <span className="text-white font-semibold">${totalPrice}</span>
+                    <span className="text-charcoal-500">Tickets:</span>
+                    <span className="font-semibold text-ink">{formatPrice(totalPrice) ?? 'Free'}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Booking Fee:</span>
-                    <span className="text-white font-semibold">${bookingFeeTotal}</span>
+                    <span className="text-charcoal-500">Booking Fee:</span>
+                    <span className="font-semibold text-ink">{formatPrice(bookingFeeTotal)}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-gray-700">
-                    <span className="text-gray-400">Total Amount:</span>
-                    <span className="text-2xl font-bold text-primary-500">${totalCharge}</span>
+                  <div className="flex justify-between items-center border-t border-charcoal-200 pt-2">
+                    <span className="text-charcoal-500">Total Amount:</span>
+                    <span className="font-display text-2xl font-bold text-whisky-700">
+                      {formatPrice(totalCharge)}
+                    </span>
                   </div>
                 </div>
                 <StripePayment
@@ -509,7 +557,7 @@ export default function EventDetailPage() {
                   onError={handlePaymentError}
                 />
                 {error && (
-                  <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded">
+                  <div className="rounded-xl border border-status-danger/30 bg-status-dangerSoft px-4 py-3 text-sm text-status-danger">
                     {error}
                   </div>
                 )}
@@ -519,7 +567,7 @@ export default function EventDetailPage() {
                     setCreatedOrderId(null)
                     setError('')
                   }}
-                  className="w-full bg-gray-800 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  className="btn-secondary w-full"
                 >
                   Back to Booking Details
                 </button>
@@ -527,58 +575,60 @@ export default function EventDetailPage() {
             ) : (
               <form onSubmit={handleBooking} className="space-y-4">
                 {error && (
-                  <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded">
+                  <div className="rounded-xl border border-status-danger/30 bg-status-dangerSoft px-4 py-3 text-sm text-status-danger">
                     {error}
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Full Name *</label>
+                  <label className="label">Full Name *</label>
                   <input
                     type="text"
                     required
                     value={bookingForm.customerName}
                     onChange={(e) => setBookingForm({ ...bookingForm, customerName: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                    className="input-field"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Email *</label>
+                  <label className="label">Email *</label>
                   <input
                     type="email"
                     required
                     value={bookingForm.customerEmail}
                     onChange={(e) => setBookingForm({ ...bookingForm, customerEmail: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                    className="input-field"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Phone</label>
+                  <label className="label">Phone</label>
                   <input
                     type="tel"
                     value={bookingForm.customerPhone}
                     onChange={(e) => setBookingForm({ ...bookingForm, customerPhone: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                    className="input-field"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Number of Tickets</label>
+                  <label className="label">Number of Tickets</label>
                   <div className="flex items-center space-x-3">
                     <button
                       type="button"
                       onClick={() => setTicketQuantity(Math.max(1, ticketQuantity - 1))}
-                      className="w-10 h-10 bg-gray-800 text-white rounded-lg hover:bg-gray-700"
+                      aria-label="Decrease ticket quantity"
+                      className="grid h-10 w-10 place-items-center rounded-full border border-charcoal-300 bg-white text-ink transition-colors hover:bg-charcoal-50"
                     >
                       -
                     </button>
-                    <span className="text-white font-semibold w-12 text-center">{ticketQuantity}</span>
+                    <span className="w-12 text-center font-semibold text-ink">{ticketQuantity}</span>
                     <button
                       type="button"
                       onClick={() => setTicketQuantity(Math.min(eventDetails.availableSpots, ticketQuantity + 1))}
-                      className="w-10 h-10 bg-gray-800 text-white rounded-lg hover:bg-gray-700"
+                      aria-label="Increase ticket quantity"
+                      className="grid h-10 w-10 place-items-center rounded-full border border-charcoal-300 bg-white text-ink transition-colors hover:bg-charcoal-50"
                     >
                       +
                     </button>
@@ -586,47 +636,45 @@ export default function EventDetailPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Special Requests</label>
+                  <label className="label">Special Requests</label>
                   <textarea
                     value={bookingForm.specialRequests}
                     onChange={(e) => setBookingForm({ ...bookingForm, specialRequests: e.target.value })}
                     rows={3}
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                    className="input-field"
                   />
                 </div>
 
-                <div className="border-t border-gray-700 pt-4 space-y-2">
+                <div className="space-y-2 border-t border-charcoal-200 pt-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Tickets:</span>
-                    <span className="text-white font-semibold">${totalPrice}</span>
+                    <span className="text-charcoal-500">Tickets:</span>
+                    <span className="font-semibold text-ink">{formatPrice(totalPrice) ?? 'Free'}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Booking Fee:</span>
-                    <span className="text-white font-semibold">${bookingFeeTotal}</span>
+                    <span className="text-charcoal-500">Booking Fee:</span>
+                    <span className="font-semibold text-ink">{formatPrice(bookingFeeTotal)}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-gray-800">
-                    <span className="text-gray-400">Total:</span>
-                    <span className="text-2xl font-bold text-primary-500">${totalCharge}</span>
+                  <div className="flex justify-between items-center border-t border-charcoal-200 pt-2">
+                    <span className="text-charcoal-500">Total:</span>
+                    <span className="font-display text-2xl font-bold text-whisky-700">
+                      {formatPrice(totalCharge)}
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex space-x-3">
+                <div className="flex space-x-3 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowBookingModal(false)}
-                    className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+                    className="btn-secondary flex-1"
                   >
                     Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 bg-primary-500 hover:bg-primary-600 text-black font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Processing...' : 'Confirm Booking'}
-                </button>
-              </div>
-            </form>
+                  </button>
+                  <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">
+                    {isSubmitting ? 'Processing...' : 'Confirm Booking'}
+                  </button>
+                </div>
+              </form>
             )}
           </motion.div>
         </div>

@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { useMutation, useQueryClient } from 'react-query'
 import { Upload } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Event } from '@/lib/types'
+import { SocialLinksField, SocialLink, cleanSocialLinks } from '@/components/SocialLinksField'
 import toast from 'react-hot-toast'
 
 interface EventFormProps {
@@ -29,9 +30,22 @@ interface EventFormData {
   organizer: string
   contactEmail: string
   contactPhone: string
+  website: string
+  socialLinks: SocialLink[]
   requirements: string[]
   isActive: boolean
   isFeatured: boolean
+}
+
+/**
+ * What actually goes over the wire. `website` (@IsUrl) and `contactEmail`
+ * (@IsEmail) are optional here because the backend's @IsOptional() only skips
+ * null/undefined — an empty string still hits the validator and 400s the whole
+ * request, so we omit them instead.
+ */
+type EventSubmitData = Omit<EventFormData, 'website' | 'contactEmail'> & {
+  website?: string
+  contactEmail?: string
 }
 
 export function EventForm({ event, onSuccess, onCancel }: EventFormProps) {
@@ -40,7 +54,7 @@ export function EventForm({ event, onSuccess, onCancel }: EventFormProps) {
   const [uploading, setUploading] = useState(false)
   const queryClient = useQueryClient()
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<EventFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, watch, control } = useForm<EventFormData>({
     defaultValues: {
       name: event?.name || '',
       type: event?.type || '',
@@ -56,13 +70,16 @@ export function EventForm({ event, onSuccess, onCancel }: EventFormProps) {
       organizer: event?.organizer || '',
       contactEmail: event?.contactEmail || '',
       contactPhone: event?.contactPhone || '',
+      // Neither is on the Event type in lib/types.ts yet, hence the casts.
+      website: ((event as any)?.website as string) || '',
+      socialLinks: ((event as any)?.socialLinks as SocialLink[]) ?? [],
       isActive: event?.isActive || true,
       isFeatured: event?.isFeatured || false,
     }
   })
 
   const createMutation = useMutation(
-    (data: EventFormData) => api.post('/events', data),
+    (data: EventSubmitData) => api.post('/events', data),
     {
       onSuccess: () => {
         queryClient.invalidateQueries('events')
@@ -75,7 +92,7 @@ export function EventForm({ event, onSuccess, onCancel }: EventFormProps) {
   )
 
   const updateMutation = useMutation(
-    (data: EventFormData) => api.patch(`/events/${event?.id}`, data),
+    (data: EventSubmitData) => api.patch(`/events/${event?.id}`, data),
     {
       onSuccess: () => {
         queryClient.invalidateQueries('events')
@@ -120,9 +137,14 @@ export function EventForm({ event, onSuccess, onCancel }: EventFormProps) {
   }
 
   const onSubmit = (data: EventFormData) => {
-    const submitData = {
+    const website = data.website?.trim()
+    const contactEmail = data.contactEmail?.trim()
+    const submitData: EventSubmitData = {
       ...data,
       requirements,
+      socialLinks: cleanSocialLinks(data.socialLinks),
+      website: website ? website : undefined,
+      contactEmail: contactEmail ? contactEmail : undefined,
     }
 
     if (event) {
@@ -341,6 +363,34 @@ export function EventForm({ event, onSuccess, onCancel }: EventFormProps) {
             />
           </div>
         </div>
+      </div>
+
+      {/* Social & Links */}
+      <div className="form-section space-y-4">
+        <div>
+          <h3 className="section-title">Social & Links</h3>
+          <p className="section-description">
+            The event&apos;s primary site, plus social profiles and any other pages worth linking.
+          </p>
+        </div>
+
+        <div>
+          <label className="label">Website</label>
+          <input
+            {...register('website')}
+            type="url"
+            className="input-field"
+            placeholder="https://example.com"
+          />
+        </div>
+
+        <Controller
+          control={control}
+          name="socialLinks"
+          render={({ field }) => (
+            <SocialLinksField value={field.value ?? []} onChange={field.onChange} />
+          )}
+        />
       </div>
 
       {/* Requirements */}

@@ -3,13 +3,17 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Star, MapPin, Clock, Phone, Share2, Heart, X, CreditCard } from 'lucide-react'
+import { MapPin, Clock, Phone, Share2, Heart, X, CreditCard } from 'lucide-react'
 import Header from '../../../components/Header'
 import Footer from '../../../components/Footer'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import ReviewsSection from '../../../components/ReviewsSection'
 import StripePayment from '../../../components/StripePayment'
+import StarRating from '../../../components/ui/StarRating'
+import { EmptyState } from '../../../components/ui/Section'
+import { formatPrice } from '../../../lib/format'
 import { apiService } from '../../../lib/api'
+import { trackView } from '../../../lib/analytics'
 import { Bar } from '../../../lib/types'
 
 
@@ -43,6 +47,8 @@ export default function BarDetailPage() {
         setLoading(true)
         const response = await apiService.getBar(Number(id))
         setBar(response.data)
+        // Record the view once the real id is known — fire-and-forget.
+        if (response.data?.id) trackView('bar', response.data.id)
       } catch (error) {
         console.error('Error fetching bar:', error)
       } finally {
@@ -57,7 +63,7 @@ export default function BarDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-cream flex items-center justify-center">
         <LoadingSpinner />
       </div>
     )
@@ -65,12 +71,15 @@ export default function BarDetailPage() {
 
   if (!bar) {
     return (
-      <div className="min-h-screen bg-black">
+      <div className="min-h-screen bg-cream">
         <Header />
-        <main className="bg-black py-12">
+        <main className="bg-cream py-12">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-2xl font-bold text-white mb-4">Bar Not Found</h1>
-            <button onClick={() => router.push('/bars')} className="text-primary-500 hover:text-primary-600">
+            <h1 className="font-display text-2xl font-bold text-ink mb-4">Bar Not Found</h1>
+            <button
+              onClick={() => router.push('/bars')}
+              className="font-semibold text-whisky-700 transition-colors hover:text-whisky-600"
+            >
               ← Back to Bars
             </button>
           </div>
@@ -153,66 +162,92 @@ export default function BarDetailPage() {
     }
   }
 
+  const hasMenu = barDetails.menu.cocktails.length > 0 || barDetails.menu.spirits.length > 0
+
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-cream text-ink">
       <Header />
-      
+
       <main>
-        {/* Hero Section */}
-        <section className="relative h-96 overflow-hidden">
-          <div 
+        {/* Hero image */}
+        <section className="relative h-80 overflow-hidden md:h-96">
+          <div
             className="w-full h-full bg-cover bg-center"
             style={{ backgroundImage: `url(${barDetails.images[selectedImage]})` }}
           >
-            <div className="absolute inset-0 bg-black/40"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-ink/50 via-ink/10 to-transparent"></div>
           </div>
-          
-          <div className="absolute inset-0 flex items-end">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 w-full">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-4xl md:text-5xl font-bold mb-2">{barDetails.name}</h1>
-                  <p className="text-xl text-gray-300">{barDetails.type} • {barDetails.location}</p>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <button
-                    onClick={() => setIsFavorite(!isFavorite)}
-                    className={`p-3 rounded-full transition-colors ${
-                      isFavorite ? 'bg-red-500 text-white' : 'bg-white/20 text-white hover:bg-white/30'
-                    }`}
-                  >
-                    <Heart className={`w-6 h-6 ${isFavorite ? 'fill-current' : ''}`} />
-                  </button>
-                  <button className="p-3 bg-white/20 text-white rounded-full hover:bg-white/30 transition-colors">
-                    <Share2 className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
+
+          {/* Actions float on the image; the title block below carries the copy so
+              the rating stays legible on a light surface. */}
+          <div className="absolute right-4 top-4 flex items-center gap-3 sm:right-6 lg:right-8">
+            <button
+              onClick={() => setIsFavorite(!isFavorite)}
+              aria-label={isFavorite ? 'Remove from favourites' : 'Add to favourites'}
+              aria-pressed={isFavorite}
+              className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-charcoal-600 shadow-soft backdrop-blur transition-colors hover:bg-white hover:text-whisky-600"
+            >
+              <Heart className={`h-5 w-5 ${isFavorite ? 'fill-whisky-500 text-whisky-500' : ''}`} />
+            </button>
+            <button
+              aria-label="Share this bar"
+              className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-charcoal-600 shadow-soft backdrop-blur transition-colors hover:bg-white hover:text-whisky-600"
+            >
+              <Share2 className="h-5 w-5" />
+            </button>
+          </div>
+        </section>
+
+        {/* Title block */}
+        <section className="border-b border-charcoal-200 bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="pill-gold">{barDetails.type}</span>
+              <span className={barDetails.isOpen ? 'pill-open' : 'pill-closed'}>
+                {barDetails.isOpen ? 'Open Now' : 'Closed'}
+              </span>
+            </div>
+
+            <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-ink md:text-5xl">
+              {barDetails.name}
+            </h1>
+
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <StarRating rating={bar.rating} reviews={bar.reviews} size="md" variant="stars" />
+              <span className="flex items-center gap-1.5 text-charcoal-600">
+                <MapPin className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                {barDetails.location}
+              </span>
+              <span className="font-semibold text-whisky-700">{barDetails.priceRange}</span>
             </div>
           </div>
         </section>
 
         {/* Image Gallery */}
-        <section className="py-8 bg-gray-900">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {barDetails.images.map((image, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedImage(index)}
-                  className={`relative h-24 rounded-lg overflow-hidden transition-all ${
-                    selectedImage === index ? 'ring-2 ring-primary-500' : 'hover:opacity-80'
-                  }`}
-                >
-                  <div 
-                    className="w-full h-full bg-cover bg-center"
-                    style={{ backgroundImage: `url(${image})` }}
-                  />
-                </button>
-              ))}
+        {barDetails.images.length > 1 && (
+          <section className="bg-cream py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {barDetails.images.map((image, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedImage(index)}
+                    className={`relative h-24 overflow-hidden rounded-xl transition-all ${
+                      selectedImage === index
+                        ? 'ring-2 ring-whisky-500 ring-offset-2 ring-offset-cream'
+                        : 'hover:opacity-80'
+                    }`}
+                  >
+                    <div
+                      className="w-full h-full bg-cover bg-center"
+                      style={{ backgroundImage: `url(${image})` }}
+                    />
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Main Content */}
         <section className="py-12">
@@ -221,16 +256,16 @@ export default function BarDetailPage() {
               {/* Left Column - Main Info */}
               <div className="lg:col-span-2">
                 {/* Tabs */}
-                <div className="mb-8">
-                  <div className="flex space-x-1 bg-gray-900 p-1 rounded-lg">
+                <div className="mb-8 border-b border-charcoal-200">
+                  <div className="-mb-px flex gap-6 overflow-x-auto scrollbar-hide">
                     {tabs.map((tab) => (
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                        className={`whitespace-nowrap border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
                           activeTab === tab.id
-                            ? 'bg-primary-500 text-black'
-                            : 'text-gray-400 hover:text-white'
+                            ? 'border-whisky-500 text-whisky-700'
+                            : 'border-transparent text-charcoal-500 hover:text-ink'
                         }`}
                       >
                         {tab.label}
@@ -247,35 +282,38 @@ export default function BarDetailPage() {
                     className="space-y-8"
                   >
                     <div>
-                      <h2 className="text-2xl font-bold mb-4">About {barDetails.name}</h2>
-                      <p className="text-gray-300 leading-relaxed">{barDetails.description}</p>
+                      <h2 className="font-display text-2xl font-bold text-ink mb-4">
+                        About {barDetails.name}
+                      </h2>
+                      <p className="leading-relaxed text-charcoal-600">{barDetails.description}</p>
                     </div>
 
-                    <div>
-                      <h3 className="text-xl font-semibold mb-4">Specialties</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {barDetails.specialties.map((specialty) => (
-                          <span
-                            key={specialty}
-                            className="px-3 py-1 bg-primary-500/20 text-primary-400 rounded-full text-sm"
-                          >
-                            {specialty}
-                          </span>
-                        ))}
+                    {barDetails.specialties.length > 0 && (
+                      <div>
+                        <h3 className="font-display text-xl font-semibold text-ink mb-4">Specialties</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {barDetails.specialties.map((specialty) => (
+                            <span key={specialty} className="pill-gold">
+                              {specialty}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div>
-                      <h3 className="text-xl font-semibold mb-4">Amenities</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {barDetails.amenities.map((amenity) => (
-                          <div key={amenity} className="flex items-center space-x-2">
-                            <div className="w-2 h-2 bg-primary-500 rounded-full"></div>
-                            <span className="text-gray-300">{amenity}</span>
-                          </div>
-                        ))}
+                    {barDetails.amenities.length > 0 && (
+                      <div>
+                        <h3 className="font-display text-xl font-semibold text-ink mb-4">Amenities</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          {barDetails.amenities.map((amenity) => (
+                            <div key={amenity} className="flex items-center space-x-2">
+                              <div className="h-2 w-2 rounded-full bg-whisky-500"></div>
+                              <span className="text-charcoal-600">{amenity}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </motion.div>
                 )}
 
@@ -285,35 +323,58 @@ export default function BarDetailPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-8"
                   >
-                    <div>
-                      <h2 className="text-2xl font-bold mb-6">Cocktails</h2>
-                      <div className="space-y-4">
-                        {barDetails.menu.cocktails.map((item, index) => (
-                          <div key={index} className="bg-gray-900 p-4 rounded-lg">
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-semibold text-lg">{item.name}</h3>
-                              <span className="text-primary-500 font-bold">{item.price}</span>
+                    {hasMenu ? (
+                      <>
+                        {barDetails.menu.cocktails.length > 0 && (
+                          <div>
+                            <h2 className="font-display text-2xl font-bold text-ink mb-6">Cocktails</h2>
+                            <div className="space-y-4">
+                              {barDetails.menu.cocktails.map((item, index) => (
+                                <div key={index} className="card p-4">
+                                  <div className="flex justify-between items-start mb-2">
+                                    <h3 className="font-display text-lg font-semibold text-ink">
+                                      {item.name}
+                                    </h3>
+                                    <span className="font-bold text-whisky-700">
+                                      {formatPrice(item.price)}
+                                    </span>
+                                  </div>
+                                  <p className="text-charcoal-500">{item.description}</p>
+                                </div>
+                              ))}
                             </div>
-                            <p className="text-gray-400">{item.description}</p>
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                        )}
 
-                    <div>
-                      <h2 className="text-2xl font-bold mb-6">Premium Spirits</h2>
-                      <div className="space-y-4">
-                        {barDetails.menu.spirits.map((item, index) => (
-                          <div key={index} className="bg-gray-900 p-4 rounded-lg">
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-semibold text-lg">{item.name}</h3>
-                              <span className="text-primary-500 font-bold">{item.price}</span>
+                        {barDetails.menu.spirits.length > 0 && (
+                          <div>
+                            <h2 className="font-display text-2xl font-bold text-ink mb-6">
+                              Premium Spirits
+                            </h2>
+                            <div className="space-y-4">
+                              {barDetails.menu.spirits.map((item, index) => (
+                                <div key={index} className="card p-4">
+                                  <div className="flex justify-between items-start mb-2">
+                                    <h3 className="font-display text-lg font-semibold text-ink">
+                                      {item.name}
+                                    </h3>
+                                    <span className="font-bold text-whisky-700">
+                                      {formatPrice(item.price)}
+                                    </span>
+                                  </div>
+                                  <p className="text-charcoal-500">{item.description}</p>
+                                </div>
+                              ))}
                             </div>
-                            <p className="text-gray-400">{item.description}</p>
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                        )}
+                      </>
+                    ) : (
+                      <EmptyState
+                        title="Menu coming soon"
+                        description="This venue hasn't published its drinks list yet. Call ahead for today's pours."
+                      />
+                    )}
                   </motion.div>
                 )}
 
@@ -333,8 +394,8 @@ export default function BarDetailPage() {
                     className="grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     {barDetails.images.map((image, index) => (
-                      <div key={index} className="relative h-64 rounded-lg overflow-hidden">
-                        <div 
+                      <div key={index} className="relative h-64 overflow-hidden rounded-2xl">
+                        <div
                           className="w-full h-full bg-cover bg-center hover:scale-105 transition-transform duration-300"
                           style={{ backgroundImage: `url(${image})` }}
                         />
@@ -346,66 +407,67 @@ export default function BarDetailPage() {
 
               {/* Right Column - Sidebar */}
               <div className="space-y-6">
-                {/* Quick Info */}
-                <div className="bg-gray-900 p-6 rounded-lg">
+                {/* Reservation panel */}
+                <div className="card sticky top-24 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                      barDetails.isOpen ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                    }`}>
+                    <span className={barDetails.isOpen ? 'pill-open' : 'pill-closed'}>
                       {barDetails.isOpen ? 'Open Now' : 'Closed'}
                     </span>
-                    <span className="text-primary-500 font-bold">{barDetails.priceRange}</span>
+                    <span className="font-bold text-whisky-700">{barDetails.priceRange}</span>
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <MapPin className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-300">{barDetails.address}</span>
+                    <div className="flex items-start space-x-3">
+                      <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-charcoal-400" strokeWidth={1.75} />
+                      <span className="text-charcoal-600">{barDetails.address}</span>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <Phone className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-300">{barDetails.phone}</span>
+                      <Phone className="h-5 w-5 shrink-0 text-charcoal-400" strokeWidth={1.75} />
+                      <span className="text-charcoal-600">{barDetails.phone}</span>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <Clock className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-300">Open until 2:00 AM</span>
+                      <Clock className="h-5 w-5 shrink-0 text-charcoal-400" strokeWidth={1.75} />
+                      <span className="text-charcoal-600">Open until 2:00 AM</span>
                     </div>
                   </div>
 
-                  <button 
+                  {requiresDeposit && (
+                    <p className="mt-4 text-sm text-charcoal-500">
+                      <span className="font-semibold text-ink">{formatPrice(depositPerGuest)}</span> per
+                      guest deposit to hold your table.
+                    </p>
+                  )}
+
+                  <button
                     onClick={() => setShowBookingModal(true)}
-                    className="w-full mt-6 bg-primary-500 hover:bg-primary-600 text-black font-semibold py-3 px-4 rounded-lg transition-colors"
+                    className="btn-primary mt-6 w-full"
                   >
                     Make Reservation
                   </button>
                 </div>
 
                 {/* Hours */}
-                <div className="bg-gray-900 p-6 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-4">Hours</h3>
-                  <div className="space-y-2">
-                    {Object.entries(barDetails.hours).map(([day, hours]) => (
-                      <div key={day} className="flex justify-between">
-                        <span className="text-gray-400 capitalize">{day}</span>
-                        <span className="text-gray-300">{hours}</span>
-                      </div>
-                    ))}
+                {Object.keys(barDetails.hours).length > 0 && (
+                  <div className="card p-6">
+                    <h3 className="font-display text-lg font-semibold text-ink mb-4">Hours</h3>
+                    <div className="space-y-2">
+                      {Object.entries(barDetails.hours).map(([day, hours]) => (
+                        <div key={day} className="flex justify-between">
+                          <span className="capitalize text-charcoal-500">{day}</span>
+                          <span className="text-charcoal-700">{hours}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Quick Actions */}
-                <div className="bg-gray-900 p-6 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+                <div className="card p-6">
+                  <h3 className="font-display text-lg font-semibold text-ink mb-4">Quick Actions</h3>
                   <div className="space-y-3">
-                    <button className="w-full bg-transparent border border-primary-500 text-primary-500 hover:bg-primary-500 hover:text-black font-semibold py-2 px-4 rounded-lg transition-colors">
-                      Share Location
-                    </button>
-                    <button className="w-full bg-transparent border border-primary-500 text-primary-500 hover:bg-primary-500 hover:text-black font-semibold py-2 px-4 rounded-lg transition-colors">
-                      Add to Favorites
-                    </button>
-                    <button className="w-full bg-transparent border border-primary-500 text-primary-500 hover:bg-primary-500 hover:text-black font-semibold py-2 px-4 rounded-lg transition-colors">
-                      Write Review
-                    </button>
+                    <button className="btn-secondary w-full">Share Location</button>
+                    <button className="btn-secondary w-full">Add to Favorites</button>
+                    <button className="btn-secondary w-full">Write Review</button>
                   </div>
                 </div>
               </div>
@@ -418,34 +480,37 @@ export default function BarDetailPage() {
 
       {/* Booking Modal */}
       {showBookingModal && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-ink/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-900 rounded-lg max-w-md w-full p-6 relative max-h-[90vh] overflow-y-auto"
+            className="card max-w-md w-full p-6 relative max-h-[90vh] overflow-y-auto"
           >
             <button
               onClick={() => setShowBookingModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              aria-label="Close"
+              className="absolute top-4 right-4 text-charcoal-400 transition-colors hover:text-ink"
             >
               <X className="w-6 h-6" />
             </button>
 
-            <h2 className="text-2xl font-bold mb-4">
+            <h2 className="font-display text-2xl font-bold text-ink mb-1">
               {showPayment ? 'Confirm payment' : 'Make Reservation'}
             </h2>
-            <p className="text-gray-400 mb-4">{barDetails.name}</p>
+            <p className="text-charcoal-500 mb-5">{barDetails.name}</p>
 
             {showPayment && createdOrderId ? (
               <div className="space-y-4">
-                <div className="bg-primary-500/10 border border-primary-500/40 rounded-lg p-4">
-                  <p className="text-sm text-primary-200 flex items-center gap-2">
-                    <CreditCard className="h-4 w-4" />
-                    Deposit: <strong className="text-white">${depositTotal.toFixed(2)}</strong> for {bookingForm.numberOfGuests}{' '}
+                <div className="rounded-xl border border-whisky-200 bg-whisky-50 p-4">
+                  <p className="flex items-center gap-2 text-sm text-whisky-700">
+                    <CreditCard className="h-4 w-4 shrink-0" />
+                    Deposit: <strong className="text-ink">{formatPrice(depositTotal)}</strong> for{' '}
+                    {bookingForm.numberOfGuests}{' '}
                     {bookingForm.numberOfGuests === 1 ? 'guest' : 'guests'}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    This holds your table. It&apos;s refundable up to {(bar as any)?.refundWindowHours || 48} hours before your booking.
+                  <p className="mt-1 text-xs text-charcoal-500">
+                    This holds your table. It&apos;s refundable up to{' '}
+                    {(bar as any)?.refundWindowHours || 48} hours before your booking.
                   </p>
                 </div>
                 <StripePayment
@@ -455,87 +520,91 @@ export default function BarDetailPage() {
                   onError={(msg) => setError(msg)}
                 />
                 {error && (
-                  <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded text-sm">
+                  <div className="rounded-xl border border-status-danger/30 bg-status-dangerSoft px-4 py-3 text-sm text-status-danger">
                     {error}
                   </div>
                 )}
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-center text-xs text-charcoal-400">
                   Your reservation is held. Payment is processed securely by Stripe.
                 </p>
               </div>
             ) : (
             <form onSubmit={handleBooking} className="space-y-4">
               {requiresDeposit && (
-                <div className="bg-yellow-500/10 border border-yellow-500/40 rounded-lg p-3 flex items-start gap-2">
-                  <CreditCard className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-xs text-yellow-200 leading-relaxed">
-                    This venue requires a <strong>${depositPerGuest.toFixed(2)} per guest deposit</strong> to hold your table. You&apos;ll pay <strong>${depositTotal.toFixed(2)}</strong> after submitting the form.
+                <div className="flex items-start gap-2 rounded-xl border border-status-warning/30 bg-status-warningSoft p-3">
+                  <CreditCard className="mt-0.5 h-4 w-4 flex-shrink-0 text-status-warning" />
+                  <div className="text-xs leading-relaxed text-charcoal-700">
+                    This venue requires a{' '}
+                    <strong className="text-ink">{formatPrice(depositPerGuest)} per guest deposit</strong>{' '}
+                    to hold your table. You&apos;ll pay{' '}
+                    <strong className="text-ink">{formatPrice(depositTotal)}</strong> after submitting the
+                    form.
                   </div>
                 </div>
               )}
               {error && (
-                <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded">
+                <div className="rounded-xl border border-status-danger/30 bg-status-dangerSoft px-4 py-3 text-sm text-status-danger">
                   {error}
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium mb-2">Full Name *</label>
+                <label className="label">Full Name *</label>
                 <input
                   type="text"
                   required
                   value={bookingForm.customerName}
                   onChange={(e) => setBookingForm({ ...bookingForm, customerName: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Email *</label>
+                <label className="label">Email *</label>
                 <input
                   type="email"
                   required
                   value={bookingForm.customerEmail}
                   onChange={(e) => setBookingForm({ ...bookingForm, customerEmail: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Phone</label>
+                <label className="label">Phone</label>
                 <input
                   type="tel"
                   value={bookingForm.customerPhone}
                   onChange={(e) => setBookingForm({ ...bookingForm, customerPhone: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Date *</label>
+                <label className="label">Date *</label>
                 <input
                   type="date"
                   required
                   value={bookingForm.bookingDate}
                   onChange={(e) => setBookingForm({ ...bookingForm, bookingDate: e.target.value })}
                   min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Time *</label>
+                <label className="label">Time *</label>
                 <input
                   type="time"
                   required
                   value={bookingForm.bookingTime}
                   onChange={(e) => setBookingForm({ ...bookingForm, bookingTime: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Number of Guests *</label>
+                <label className="label">Number of Guests *</label>
                 <input
                   type="number"
                   required
@@ -543,33 +612,29 @@ export default function BarDetailPage() {
                   max="20"
                   value={bookingForm.numberOfGuests}
                   onChange={(e) => setBookingForm({ ...bookingForm, numberOfGuests: parseInt(e.target.value) })}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Special Requests</label>
+                <label className="label">Special Requests</label>
                 <textarea
                   value={bookingForm.specialRequests}
                   onChange={(e) => setBookingForm({ ...bookingForm, specialRequests: e.target.value })}
                   rows={3}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-primary-500"
+                  className="input-field"
                 />
               </div>
 
-              <div className="flex space-x-3">
+              <div className="flex space-x-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowBookingModal(false)}
-                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+                  className="btn-secondary flex-1"
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 bg-primary-500 hover:bg-primary-600 text-black font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
-                >
+                <button type="submit" disabled={isSubmitting} className="btn-primary flex-1">
                   {isSubmitting ? 'Processing…' : requiresDeposit ? 'Continue to payment' : 'Confirm Reservation'}
                 </button>
               </div>

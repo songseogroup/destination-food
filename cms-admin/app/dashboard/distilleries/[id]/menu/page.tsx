@@ -50,7 +50,7 @@ export default function DistilleryMenuPage() {
 
   return (
     <div className="space-y-6">
-      <AdminDetailNav id={id} type="distilleries" name={distillery.name} />
+      <AdminDetailNav id={id} type="distilleries" name={distillery.name} isActive={distillery.isActive !== false} />
 
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="flex flex-col gap-4 border-b border-gray-200 p-6 sm:flex-row sm:items-center sm:justify-between">

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight, Check } from 'lucide-react'
 import { useCustomerAuth } from '../../../contexts/CustomerAuthContext'
+import GoogleAuthButton, { AuthDivider } from '../../../components/GoogleAuthButton'
+import Logo from '../../../components/Logo'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -27,14 +29,19 @@ export default function SignupPage() {
     interests: [] as string[],
   })
 
+  /*
+   * Values are stored verbatim in customer.preferences.interests (string[], no
+   * server-side enum), so these map to what the marketplace actually sells:
+   * bars, distilleries, events, collections.
+   */
   const interestOptions = [
-    { value: 'wine', label: 'Wine' },
-    { value: 'whiskey', label: 'Whiskey' },
+    { value: 'tastings', label: 'Tastings' },
+    { value: 'distillery_tours', label: 'Distillery Tours' },
+    { value: 'bar_events', label: 'Bar Events' },
+    { value: 'festivals', label: 'Festivals' },
+    { value: 'masterclasses', label: 'Masterclasses' },
+    { value: 'rare_collectable', label: 'Rare & Collectable' },
     { value: 'cocktails', label: 'Cocktails' },
-    { value: 'beer', label: 'Beer' },
-    { value: 'food', label: 'Food' },
-    { value: 'tours', label: 'Tours' },
-    { value: 'events', label: 'Events' },
   ]
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,37 +99,39 @@ export default function SignupPage() {
     }
   }
 
-  const inputClass =
-    'block w-full pl-10 pr-3 py-3 bg-gray-800 text-white placeholder:text-gray-500 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
-  const inputWithToggleClass =
-    'block w-full pl-10 pr-10 py-3 bg-gray-800 text-white placeholder:text-gray-500 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
-
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-lg w-full space-y-8 bg-gray-900 p-8 rounded-2xl shadow-2xl shadow-primary-500/10 border border-gray-800">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-cream px-4 py-12 sm:px-6 lg:px-8">
+      <Logo className="mb-8 text-charcoal-900" variant="stacked" />
+
+      <div className="w-full max-w-lg rounded-3xl border border-charcoal-200 bg-white p-8 shadow-card">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-white">
-            Create your <span className="text-primary-500">account</span>
-          </h2>
-          <p className="mt-2 text-gray-400">Join ByFoods to start ordering</p>
+          <h1 className="font-display text-3xl font-bold text-ink">Create your account</h1>
+          <p className="mt-2 text-charcoal-500">Create an account to book whisky experiences</p>
         </div>
 
         {error && (
-          <div className="bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 rounded-lg">
+          <div
+            role="alert"
+            className="mt-6 rounded-xl border border-status-danger/25 bg-status-dangerSoft px-4 py-3 text-sm text-status-danger"
+          >
             {error}
           </div>
         )}
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <div className="mt-6">
+          <GoogleAuthButton mode="signup" onError={setError} redirectTo="/" />
+        </div>
+
+        <AuthDivider />
+
+        <form className="space-y-5" onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-200 mb-1">
+              <label htmlFor="firstName" className="label">
                 First name
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-500" />
-                </div>
+                <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
                 <input
                   id="firstName"
                   name="firstName"
@@ -130,19 +139,17 @@ export default function SignupPage() {
                   required
                   value={formData.firstName}
                   onChange={handleChange}
-                  className={inputClass}
+                  className="input-field pl-10"
                   placeholder="First name"
                 />
               </div>
             </div>
             <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-200 mb-1">
+              <label htmlFor="lastName" className="label">
                 Last name
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-500" />
-                </div>
+                <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
                 <input
                   id="lastName"
                   name="lastName"
@@ -150,7 +157,7 @@ export default function SignupPage() {
                   required
                   value={formData.lastName}
                   onChange={handleChange}
-                  className={inputClass}
+                  className="input-field pl-10"
                   placeholder="Last name"
                 />
               </div>
@@ -158,13 +165,11 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-200 mb-1">
+            <label htmlFor="email" className="label">
               Email address
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-5 w-5 text-gray-500" />
-              </div>
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
               <input
                 id="email"
                 name="email"
@@ -173,20 +178,18 @@ export default function SignupPage() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className={inputClass}
-                placeholder="Enter your email"
+                className="input-field pl-10"
+                placeholder="you@example.com"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-200 mb-1">
-              Phone number <span className="text-gray-500">(optional)</span>
+            <label htmlFor="phone" className="label">
+              Phone number <span className="font-normal text-charcoal-400">(optional)</span>
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Phone className="h-5 w-5 text-gray-500" />
-              </div>
+              <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
               <input
                 id="phone"
                 name="phone"
@@ -194,20 +197,18 @@ export default function SignupPage() {
                 autoComplete="tel"
                 value={formData.phone}
                 onChange={handleChange}
-                className={inputClass}
+                className="input-field pl-10"
                 placeholder="Enter your phone number"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-200 mb-1">
+            <label htmlFor="password" className="label">
               Password
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-500" />
-              </div>
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
               <input
                 id="password"
                 name="password"
@@ -216,31 +217,26 @@ export default function SignupPage() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className={inputWithToggleClass}
+                className="input-field pl-10 pr-11"
                 placeholder="Create a password (min 6 chars)"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-charcoal-400 transition-colors hover:text-whisky-600"
               >
-                {showPassword ? (
-                  <EyeOff className="h-5 w-5 text-gray-500 hover:text-primary-500" />
-                ) : (
-                  <Eye className="h-5 w-5 text-gray-500 hover:text-primary-500" />
-                )}
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-200 mb-1">
+            <label htmlFor="confirmPassword" className="label">
               Confirm password
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-500" />
-              </div>
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
               <input
                 id="confirmPassword"
                 name="confirmPassword"
@@ -249,100 +245,95 @@ export default function SignupPage() {
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className={inputWithToggleClass}
+                className="input-field pl-10 pr-11"
                 placeholder="Confirm your password"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-charcoal-400 transition-colors hover:text-whisky-600"
               >
-                {showConfirmPassword ? (
-                  <EyeOff className="h-5 w-5 text-gray-500 hover:text-primary-500" />
-                ) : (
-                  <Eye className="h-5 w-5 text-gray-500 hover:text-primary-500" />
-                )}
+                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
 
           {/* Interests */}
           <div>
-            <label className="block text-sm font-medium text-gray-200 mb-2">
-              What are you interested in?
-            </label>
+            <span className="label">What are you interested in?</span>
             <div className="flex flex-wrap gap-2">
-              {interestOptions.map((interest) => (
-                <button
-                  key={interest.value}
-                  type="button"
-                  onClick={() => toggleInterest(interest.value)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                    preferences.interests.includes(interest.value)
-                      ? 'bg-primary-500 text-black'
-                      : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 hover:text-white'
-                  }`}
-                >
-                  {preferences.interests.includes(interest.value) && (
-                    <Check className="w-3 h-3 inline mr-1" />
-                  )}
-                  {interest.label}
-                </button>
-              ))}
+              {interestOptions.map((interest) => {
+                const selected = preferences.interests.includes(interest.value)
+                return (
+                  <button
+                    key={interest.value}
+                    type="button"
+                    onClick={() => toggleInterest(interest.value)}
+                    aria-pressed={selected}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                      selected
+                        ? 'bg-whisky-500 text-white'
+                        : 'border border-charcoal-200 bg-white text-charcoal-600 hover:border-charcoal-300 hover:bg-charcoal-50 hover:text-ink'
+                    }`}
+                  >
+                    {selected && <Check className="h-3 w-3" />}
+                    {interest.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
           {/* Marketing preferences */}
           <div className="space-y-3">
-            <label className="flex items-start cursor-pointer">
+            <label className="flex cursor-pointer items-start gap-2">
               <input
                 type="checkbox"
                 checked={preferences.receiveMarketingEmails}
                 onChange={(e) => setPreferences(prev => ({ ...prev, receiveMarketingEmails: e.target.checked }))}
-                className="h-4 w-4 mt-0.5 accent-primary-500 bg-gray-800 border-gray-700 rounded"
+                className="mt-0.5 h-4 w-4 rounded border-charcoal-300 accent-whisky-500"
               />
-              <span className="ml-2 text-sm text-gray-300">
+              <span className="text-sm text-charcoal-600">
                 Send me marketing emails about new features and offers
               </span>
             </label>
-            <label className="flex items-start cursor-pointer">
+            <label className="flex cursor-pointer items-start gap-2">
               <input
                 type="checkbox"
                 checked={preferences.receivePromotionalDeals}
                 onChange={(e) => setPreferences(prev => ({ ...prev, receivePromotionalDeals: e.target.checked }))}
-                className="h-4 w-4 mt-0.5 accent-primary-500 bg-gray-800 border-gray-700 rounded"
+                className="mt-0.5 h-4 w-4 rounded border-charcoal-300 accent-whisky-500"
               />
-              <span className="ml-2 text-sm text-gray-300">
+              <span className="text-sm text-charcoal-600">
                 Send me deals and promotions based on my interests
               </span>
             </label>
           </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-primary-500 hover:bg-primary-600 text-black font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <button type="submit" disabled={isLoading} className="btn-primary w-full">
             {isLoading ? (
-              <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
             ) : (
               <>
                 Create account
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="h-4 w-4" />
               </>
             )}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-400">
-            Already have an account?{' '}
-            <Link href="/auth/login" className="font-medium text-primary-500 hover:text-primary-400">
-              Sign in
-            </Link>
-          </p>
-        </div>
+        <p className="mt-6 text-center text-sm text-charcoal-500">
+          Already have an account?{' '}
+          <Link href="/auth/login" className="font-semibold text-whisky-700 hover:text-whisky-600">
+            Sign in
+          </Link>
+        </p>
       </div>
+
+      <Link href="/" className="mt-6 text-sm text-charcoal-500 transition-colors hover:text-ink">
+        ← Back to Destination Whisky
+      </Link>
     </div>
   )
 }

@@ -17,6 +17,7 @@ import {
   Settings,
   ShoppingCart,
   Star,
+  TrendingUp,
   Users,
 } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -24,6 +25,12 @@ import { auth, User } from '@/lib/auth'
 import { Bar, Blog, Distillery, Event } from '@/lib/types'
 import { isOwnerRole, isPlatformRole, isSuperAdmin, roleLabels } from '@/lib/roles'
 import { OwnerSetupChecklist } from '@/components/OwnerSetupChecklist'
+import { MiniChart } from '@/components/analytics/MiniChart'
+
+interface AnalyticsSummaryLite {
+  totals: { views: number; clicks: number }
+  timeseries: { date: string; views: number; clicks: number }[]
+}
 
 type Listing = (Bar | Distillery | Event) & { userId?: number }
 
@@ -55,6 +62,12 @@ export default function DashboardPage() {
   const blogsQuery = useQuery('dashboard-blogs', () => api.get('/blogs?limit=5').then((res) => res.data), {
     enabled: platformRole,
   })
+
+  const analyticsQuery = useQuery<AnalyticsSummaryLite>(
+    ['dashboard-analytics', role],
+    () => api.get('/analytics/summary?days=30').then((res) => res.data),
+    { enabled: platformRole || isOwnerRole(role) },
+  )
 
   const ownerListings = useMemo<Listing[]>(() => {
     const ownedOnly = (entity: Listing) => !user || !entity.userId || entity.userId === user.id
@@ -111,6 +124,13 @@ export default function DashboardPage() {
 
       {platformRole ? (
         <>
+          <AnalyticsPreview
+            title="Platform analytics"
+            subtitle="Total views and clicks across every listing on the platform."
+            data={analyticsQuery.data}
+            isLoading={analyticsQuery.isLoading}
+          />
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {platformStats.map((stat, index) => (
               <motion.div
@@ -164,7 +184,14 @@ export default function DashboardPage() {
       ) : isOwnerRole(role) ? (
         <>
           <OwnerSetupChecklist />
-          
+
+          <AnalyticsPreview
+            title="Your listing performance"
+            subtitle="How visitors are engaging with your listing — share these stats with your team."
+            data={analyticsQuery.data}
+            isLoading={analyticsQuery.isLoading}
+          />
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <OwnerStat label="Active Listings" value={ownerListings.length} icon={Users} />
             <OwnerStat label="Published Media" value="Manage" icon={Image} />
@@ -229,6 +256,62 @@ function OwnerCommandCenter({ role, listing }: { role: string; listing: Listing 
         </div>
       </section>
     </div>
+  )
+}
+
+function AnalyticsPreview({
+  title,
+  subtitle,
+  data,
+  isLoading,
+}: {
+  title: string
+  subtitle: string
+  data?: AnalyticsSummaryLite
+  isLoading: boolean
+}) {
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-whisky-600" />
+            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          </div>
+          <p className="mt-1 max-w-xl text-sm text-gray-600">{subtitle}</p>
+        </div>
+        <Link href="/dashboard/analytics" className="btn-secondary shrink-0">
+          View full analytics
+        </Link>
+      </div>
+
+      {isLoading ? (
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-[220px_minmax(0,1fr)]">
+          <div className="skeleton h-16" />
+          <div className="skeleton h-16" />
+        </div>
+      ) : (
+        <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-[220px_minmax(0,1fr)] sm:items-center">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-charcoal-500">Views</p>
+              <p className="mt-1 font-display text-2xl font-semibold text-ink">
+                {(data?.totals.views ?? 0).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-charcoal-500">Clicks</p>
+              <p className="mt-1 font-display text-2xl font-semibold text-ink">
+                {(data?.totals.clicks ?? 0).toLocaleString()}
+              </p>
+            </div>
+          </div>
+          <MiniChart data={data?.timeseries ?? []} height={64} metric="views" />
+        </div>
+      )}
+
+      <p className="mt-3 text-xs text-charcoal-400">Last 30 days</p>
+    </section>
   )
 }
 

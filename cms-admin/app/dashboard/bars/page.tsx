@@ -1,23 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { motion } from 'framer-motion'
-import { Plus, Search, Settings, Trash2, Eye, EyeOff } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
-import { isSuperAdmin } from '@/lib/roles'
+import { isPlatformRole } from '@/lib/roles'
 import { Bar } from '@/lib/types'
+import { BarForm } from '@/components/BarForm'
+import { Modal } from '@/components/Modal'
 import toast from 'react-hot-toast'
 
 export default function BarsPage() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editingBar, setEditingBar] = useState<Bar | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const router = useRouter()
   const queryClient = useQueryClient()
-  const canCreate = isSuperAdmin(auth.getUser()?.role)
+  // Platform staff (admin + super_admin) can create listings. This was
+  // isSuperAdmin only, which paired with the backend's @Roles(ADMIN, ...) —
+  // that omitted SUPER_ADMIN — meant nobody could actually create one.
+  const canCreate = isPlatformRole(auth.getUser()?.role)
 
   const { data: barsData, isLoading } = useQuery(
     ['bars', currentPage, searchTerm],
@@ -70,8 +74,20 @@ export default function BarsPage() {
     toggleActiveMutation.mutate({ id: bar.id, isActive: bar.isActive })
   }
 
-  const handleCreateNew = () => {
-    router.push('/dashboard/bars/new')
+  const handleEdit = (bar: Bar) => {
+    setEditingBar(bar)
+    setShowForm(true)
+  }
+
+  const handleFormClose = () => {
+    setShowForm(false)
+    setEditingBar(null)
+  }
+
+  const handleFormSuccess = () => {
+    queryClient.invalidateQueries('bars')
+    handleFormClose()
+    toast.success(editingBar ? 'Bar updated successfully' : 'Bar created successfully')
   }
 
   return (
@@ -84,7 +100,7 @@ export default function BarsPage() {
         </div>
         {canCreate && (
           <button
-            onClick={handleCreateNew}
+            onClick={() => setShowForm(true)}
             className="btn-primary"
           >
             <Plus className="h-5 w-5 mr-2" />
@@ -192,13 +208,13 @@ export default function BarsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        <Link
-                          href={`/dashboard/bars/${bar.id}`}
+                        <button
+                          onClick={() => handleEdit(bar)}
                           className="text-primary-600 hover:text-primary-900"
                           title="Edit bar details"
                         >
-                          <Settings className="h-4 w-4" />
-                        </Link>
+                          <Edit className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleToggleActive(bar)}
                           className="text-gray-600 hover:text-gray-900"
@@ -247,6 +263,20 @@ export default function BarsPage() {
           </div>
         )}
       </div>
+
+      {/* Bar Form Modal */}
+      <Modal
+        isOpen={showForm}
+        onClose={handleFormClose}
+        title={editingBar ? 'Edit Bar' : 'Add New Bar'}
+        size="xl"
+      >
+        <BarForm
+          bar={editingBar}
+          onSuccess={handleFormSuccess}
+          onCancel={handleFormClose}
+        />
+      </Modal>
     </div>
   )
 }
