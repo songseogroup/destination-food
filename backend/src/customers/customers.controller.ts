@@ -15,6 +15,7 @@ import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { LoginCustomerDto } from './dto/login-customer.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 import { CustomerForgotPasswordDto, CustomerResetPasswordDto } from './dto/forgot-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -36,6 +37,15 @@ export class CustomersController {
   @Post('login')
   login(@Body() loginDto: LoginCustomerDto) {
     return this.customersService.login(loginDto);
+  }
+
+  /**
+   * Google sign-in / sign-up. Public: the Google ID token in the body is the
+   * credential, and it is verified server-side against Google's certs.
+   */
+  @Post('auth/google')
+  googleAuth(@Body() dto: GoogleAuthDto) {
+    return this.customersService.loginWithGoogle(dto.idToken);
   }
 
   @Post('forgot-password')

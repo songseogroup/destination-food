@@ -1,4 +1,6 @@
-import { IsString, IsNumber, IsBoolean, IsArray, IsOptional, IsUrl, IsObject, IsInt, Min } from 'class-validator';
+import { IsString, IsNumber, IsBoolean, IsArray, IsOptional, IsUrl, IsObject, IsInt, Min, ValidateNested } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import { SocialLinkDto } from '../../common/dto/social-link.dto';
 
 export class CreateDistilleryDto {
   @IsString()
@@ -48,6 +50,11 @@ export class CreateDistilleryDto {
   phone?: string;
 
   @IsOptional()
+  // class-validator's @IsOptional() only skips null/undefined — an empty string
+  // still runs @IsUrl/@IsEmail and 400s the whole request (forbidNonWhitelisted
+  // + no partial save). Admin forms submit '' for untouched optional inputs, so
+  // normalise blank to undefined before validation runs.
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   @IsUrl()
   website?: string;
 
@@ -68,4 +75,14 @@ export class CreateDistilleryDto {
   @IsInt()
   @Min(1)
   refundWindowHours?: number;
+
+  /**
+   * Instagram / Facebook / YouTube / X plus `other` links such as a charity or
+   * GoFundMe page. `website` above stays the venue's primary site.
+   */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SocialLinkDto)
+  socialLinks?: SocialLinkDto[];
 }

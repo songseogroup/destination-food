@@ -1,15 +1,19 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Param, 
-  UseGuards 
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 import { HomepageService } from './homepage.service';
-import { UpdateHomepageContentDto } from './dto/update-homepage-content.dto';
+import {
+  UpdateHomepageContentDto,
+  ReorderHomepageDto,
+} from './dto/update-homepage-content.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -25,6 +29,13 @@ export class HomepageController {
   @ApiResponse({ status: 200, description: 'Homepage content retrieved successfully' })
   async findAll() {
     return this.homepageService.findAll();
+  }
+
+  @Get('layout')
+  @ApiOperation({ summary: 'Get the ordered, visible homepage layout (Public)' })
+  @ApiResponse({ status: 200, description: 'Homepage layout retrieved successfully' })
+  async findPublicLayout() {
+    return this.homepageService.findPublicLayout();
   }
 
   @Get(':section')
@@ -54,5 +65,26 @@ export class HomepageController {
   async initializeDefaultContent() {
     await this.homepageService.initializeDefaultContent();
     return { message: 'Default homepage content initialized successfully' };
+  }
+
+  @Post('reorder')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reorder / toggle homepage sections (SuperAdmin only)' })
+  @ApiResponse({ status: 200, description: 'Homepage layout updated successfully' })
+  async reorder(@Body() dto: ReorderHomepageDto) {
+    return this.homepageService.reorder(dto);
+  }
+
+  @Delete(':section')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remove a non-core homepage section (SuperAdmin only)' })
+  @ApiResponse({ status: 200, description: 'Section removed successfully' })
+  @ApiResponse({ status: 400, description: 'Core sections cannot be removed' })
+  async remove(@Param('section') section: string) {
+    return this.homepageService.remove(section);
   }
 }

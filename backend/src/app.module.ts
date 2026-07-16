@@ -25,6 +25,7 @@ import { BannersModule } from './banners/banners.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 // Entities
 import { User } from './users/entities/user.entity';
@@ -45,6 +46,60 @@ import { Customer } from './customers/entities/customer.entity';
 import { Banner } from './banners/entities/banner.entity';
 import { Review } from './reviews/entities/review.entity';
 import { Feedback } from './feedback/entities/feedback.entity';
+import { AnalyticsEvent } from './analytics/entities/analytics-event.entity';
+
+/** The resolved database target. DATABASE_URL wins over the DB_* vars. */
+const databaseUrl =
+  process.env.DATABASE_URL ||
+  `postgresql://${process.env.DB_USERNAME || 'postgres'}:${process.env.DB_PASSWORD || 'password'}@${
+    process.env.DB_HOST || 'localhost'
+  }:${process.env.DB_PORT || 5432}/${process.env.DB_DATABASE || 'byfoods_cms'}`;
+
+/**
+ * Parse the URL into explicit connection fields.
+ *
+ * TypeORM's own URL parser mishandles the Supabase pooler username
+ * `postgres.<project-ref>` — it connected as bare `postgres`, which the server
+ * rejects. Passing host/username/password explicitly (via Node's URL parser,
+ * which keeps the dotted username intact) sidesteps that entirely.
+ */
+function parseDbUrl(url: string) {
+  const u = new URL(url);
+  return {
+    host: u.hostname,
+    port: u.port ? parseInt(u.port, 10) : 5432,
+    username: decodeURIComponent(u.username) || 'postgres',
+    password: decodeURIComponent(u.password) || '',
+    database: u.pathname.replace(/^\//, '') || 'postgres',
+  };
+}
+
+const db = parseDbUrl(databaseUrl);
+
+/** Hosted Postgres (Supabase / Neon / RDS) needs TLS; a local one must not use it. */
+const isHosted = !/^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(db.host);
+
+/**
+ * Refuse to auto-sync the schema of a hosted database by accident.
+ *
+ * DB_SYNCHRONIZE=true against a hosted database is how a client's schema gets
+ * silently ALTERed — and columns DROPPED — by a developer just starting the
+ * API. It stays blocked unless CONFIRM_HOSTED_SYNC=true is also set, which is
+ * the explicit "yes, sync this hosted database on purpose" acknowledgement
+ * (used once to create the schema on a brand-new, empty database).
+ */
+if (
+  process.env.DB_SYNCHRONIZE === 'true' &&
+  isHosted &&
+  process.env.CONFIRM_HOSTED_SYNC !== 'true'
+) {
+  throw new Error(
+    `Refusing to start: DB_SYNCHRONIZE=true against a hosted database (${db.host}).\n` +
+      `TypeORM would ALTER — and can DROP columns from — this schema on boot.\n` +
+      `If this is a NEW, EMPTY database and you intend to create the schema, set\n` +
+      `CONFIRM_HOSTED_SYNC=true as well. Otherwise use backend/scripts/*.sql.`,
+  );
+}
 
 @Module({
   imports: [
@@ -54,7 +109,12 @@ import { Feedback } from './feedback/entities/feedback.entity';
     ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: process.env.DATABASE_URL || `postgresql://${process.env.DB_USERNAME || 'postgres'}:${process.env.DB_PASSWORD || 'password'}@${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 5432}/${process.env.DB_DATABASE || 'byfoods_cms'}`,
+      // Explicit fields, not `url:` — see parseDbUrl above (pooler username fix).
+      host: db.host,
+      port: db.port,
+      username: db.username,
+      password: db.password,
+      database: db.database,
       entities: [
         User, 
         Bar, 
@@ -74,10 +134,28 @@ import { Feedback } from './feedback/entities/feedback.entity';
         Banner,
         Review,
         Feedback,
+        AnalyticsEvent,
       ],
-      synchronize: process.env.NODE_ENV === 'development',
+      /**
+       * Schema auto-sync is now explicit opt-in, and defaults to OFF.
+       *
+       * This was `NODE_ENV === 'development'`, which is a trap: NODE_ENV is
+       * 'development' on every developer's machine, while DATABASE_URL points at
+       * a hosted Supabase database. So simply starting the API locally handed
+       * TypeORM permission to ALTER a live schema — and synchronize drops columns
+       * it doesn't recognise, so it can destroy data, not just add to it.
+       *
+       * Set DB_SYNCHRONIZE=true only when the target is a throwaway local
+       * database. For hosted databases use the SQL in backend/scripts/ instead.
+       */
+      synchronize: process.env.DB_SYNCHRONIZE === 'true',
       logging: process.env.NODE_ENV === 'development',
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      /**
+       * SSL follows the host, not NODE_ENV. Hosted Postgres (Supabase, Neon,
+       * RDS) requires TLS, so keying this off NODE_ENV meant a local run against
+       * a hosted database could not connect at all.
+       */
+      ssl: isHosted ? { rejectUnauthorized: false } : false,
     }),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
@@ -102,6 +180,7 @@ import { Feedback } from './feedback/entities/feedback.entity';
     NotificationsModule,
     ReviewsModule,
     FeedbackModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

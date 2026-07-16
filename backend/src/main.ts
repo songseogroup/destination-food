@@ -1,3 +1,8 @@
+// MUST be first: loads .env into process.env before app.module.ts is imported.
+// Without this, the top-level `const databaseUrl = process.env.DATABASE_URL || …`
+// in app.module.ts runs before ConfigModule loads .env, so the app silently
+// fell back to the localhost connection and never used DATABASE_URL at all.
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -67,9 +72,10 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   await app.listen(port);
   
-  console.log(`🚀 ByFoods CMS API is running on: http://localhost:${port}`);
+  console.log(`🚀 Destination Whisky API is running on: http://localhost:${port}`);
   console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
-  console.log(`🔐 Default Admin: admin@byfoods.com / admin123`);
+  // The admin email and password were logged here on every boot, including in
+  // production logs. Credentials do not belong in stdout.
 }
 
 bootstrap();

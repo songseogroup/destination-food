@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { SocialLink } from '../../common/dto/social-link.dto';
 
 @Entity('events')
 export class Event {
@@ -61,6 +62,25 @@ export class Event {
   @Column({ nullable: true })
   contactPhone: string;
 
+  /** Event had no website column at all, unlike Bar and Distillery. */
+  @Column({ nullable: true })
+  website: string;
+
+  /**
+   * Denormalised review aggregate, mirroring Bar and Distillery.
+   *
+   * The Review entity already supports entityType='event', but Event carried no
+   * rating/reviews columns — so event cards could never show the star rating and
+   * review count that every other listing type shows. Kept as a denormalised
+   * pair for consistency with the other two entities; ReviewsService should
+   * recalculate these on review create/delete.
+   */
+  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
+  rating: number;
+
+  @Column({ default: 0 })
+  reviews: number;
+
   @Column('json', { nullable: true })
   requirements: string[];
 
@@ -69,6 +89,14 @@ export class Event {
 
   @Column({ type: 'int', default: 48 })
   refundWindowHours: number;
+
+  /**
+   * Social + external links, e.g. Instagram, Facebook, YouTube, X, and `other`
+   * links such as a charity or GoFundMe page (named via `label`).
+   * See common/dto/social-link.dto.ts for the shape.
+   */
+  @Column('json', { nullable: true })
+  socialLinks: SocialLink[];
 
   @Column({ default: true })
   isActive: boolean;

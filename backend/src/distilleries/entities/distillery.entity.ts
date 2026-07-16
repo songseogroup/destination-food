@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { SocialLink } from '../../common/dto/social-link.dto';
 
 @Entity('distilleries')
 export class Distillery {
@@ -59,6 +60,14 @@ export class Distillery {
 
   @Column({ type: 'int', default: 48 })
   refundWindowHours: number;
+
+  /**
+   * Social + external links, e.g. Instagram, Facebook, YouTube, X, and `other`
+   * links such as a charity or GoFundMe page (named via `label`).
+   * See common/dto/social-link.dto.ts for the shape.
+   */
+  @Column('json', { nullable: true })
+  socialLinks: SocialLink[];
 
   @Column({ default: true })
   isActive: boolean;

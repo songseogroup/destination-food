@@ -27,7 +27,32 @@ export class Banner {
   @Column({ nullable: true })
   subtitle: string;
 
-  @Column()
+  /**
+   * Promo-band campaign fields.
+   *
+   * A `featured_above` banner renders as a promo band: a copy block on the left
+   * (highlight + title + subtitle + CTA) beside a row of discounted listing
+   * cards. These three drive that block; every other slot ignores them and
+   * still renders as a plain image tile.
+   */
+
+  /** The large accent line, e.g. "Save 10%". */
+  @Column({ nullable: true })
+  highlight: string;
+
+  /** CTA button label, e.g. "Explore Now". Defaults to "Explore now" when unset. */
+  @Column({ nullable: true })
+  ctaLabel: string;
+
+  /** Ribbon stamped on each card in the band, e.g. "Winter Special". */
+  @Column({ nullable: true })
+  badgeLabel: string;
+
+  /**
+   * imageUrl is optional for promo bands — the cards carry the imagery there —
+   * but stays required in practice for the plain image slots.
+   */
+  @Column({ nullable: true })
   imageUrl: string;
 
   @Column({ nullable: true })

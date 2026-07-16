@@ -19,20 +19,53 @@ export async function seedDatabase(dataSource: DataSource) {
   const blogRepository = dataSource.getRepository(Blog);
   const platformConfigRepository = dataSource.getRepository(PlatformConfig);
 
-  // Create default admin user
-  const existingAdmin = await userRepository.findOne({ where: { email: 'admin@byfoods.com' } });
-  if (!existingAdmin) {
-    const hashedPassword = await bcrypt.hash('admin123', 10);
-    const adminUser = userRepository.create({
-      email: 'admin@byfoods.com',
-      password: hashedPassword,
-      firstName: 'Super',
-      lastName: 'Admin',
-      role: UserRole.ADMIN,
-      isActive: true,
+  /**
+   * Bootstrap super admin.
+   *
+   * This block previously created admin@byfoods.com / admin123 with role
+   * `admin` — never `super_admin`. Since seedDatabase() runs on every boot and
+   * SUPER_ADMIN_EMAIL/PASSWORD gate it, a database could end up with no super
+   * admin at all, which silently disables every super-admin-only surface: the
+   * homepage builder, payout review, and notifySuperAdminsOfVendor (which
+   * returns early when no super admin exists, so vendor sign-ups notify nobody).
+   *
+   * The credentials now come from the environment. A hardcoded 'admin123' in a
+   * seed that runs against production on every boot is not a default worth
+   * keeping — if the env vars are unset, this is skipped rather than creating a
+   * known-password administrator.
+   *
+   * To reset an EXISTING database (this block only fires when the email is
+   * absent), use: node scripts/reset-super-admin.js
+   */
+  const bootstrapEmail = (process.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
+  const bootstrapPassword = process.env.SUPER_ADMIN_PASSWORD || '';
+
+  if (bootstrapEmail && bootstrapPassword) {
+    const existingAdmin = await userRepository.findOne({ where: { email: bootstrapEmail } });
+    if (!existingAdmin) {
+      const hashedPassword = await bcrypt.hash(bootstrapPassword, 10);
+      const adminUser = userRepository.create({
+        email: bootstrapEmail,
+        password: hashedPassword,
+        firstName: 'Super',
+        lastName: 'Admin',
+        role: UserRole.SUPER_ADMIN,
+        isActive: true,
+      });
+      await userRepository.save(adminUser);
+      console.log(`✅ Super admin created: ${bootstrapEmail}`);
+    }
+  } else {
+    const superAdminCount = await userRepository.count({
+      where: { role: UserRole.SUPER_ADMIN },
     });
-    await userRepository.save(adminUser);
-    console.log('✅ Default admin user created: admin@byfoods.com / admin123');
+    if (superAdminCount === 0) {
+      console.warn(
+        '⚠️  No super admin exists and SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD are unset.\n' +
+          '    The homepage builder, payout review and vendor approval notifications will be\n' +
+          '    unreachable. Create one with: node scripts/reset-super-admin.js',
+      );
+    }
   }
 
   // Initialize default homepage content

@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException, ConflictException, UnauthorizedException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ConflictException, UnauthorizedException, ServiceUnavailableException, Logger } from '@nestjs/common';
+import { OAuth2Client, TokenPayload } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
@@ -133,6 +134,15 @@ export class CustomersService {
       throw new UnauthorizedException('Account is deactivated');
     }
 
+    // A customer created via Google sign-in has no password hash. bcrypt.compare
+    // throws on a null hash ("Illegal arguments"), which would surface as a 500
+    // instead of a clean 401, so check before comparing.
+    if (!customer.password) {
+      throw new UnauthorizedException(
+        'This account uses Google sign-in. Continue with Google, or set a password via Forgot password.',
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(loginDto.password, customer.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -148,6 +158,92 @@ export class CustomersService {
       customer: customerWithoutPassword as Customer,
       token,
     };
+  }
+
+  /**
+   * Signs a customer in with a Google ID token, creating the account on first
+   * use so one button covers both sign-in and sign-up.
+   *
+   * The token is verified against Google's published certs via OAuth2Client —
+   * signature, expiry and `aud` are all checked. Nothing from the client is
+   * trusted: the email comes out of the verified payload, not the request body.
+   */
+  async loginWithGoogle(idToken: string): Promise<{ customer: Customer; token: string }> {
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      this.logger.error('GOOGLE_CLIENT_ID is not set — rejecting Google sign-in');
+      throw new ServiceUnavailableException('Google sign-in is not configured');
+    }
+
+    let payload: TokenPayload | undefined;
+    try {
+      const client = new OAuth2Client(clientId);
+      const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+      payload = ticket.getPayload();
+    } catch (error) {
+      this.logger.warn(`Google ID token verification failed: ${error?.message}`);
+      throw new UnauthorizedException('Invalid Google sign-in token');
+    }
+
+    if (!payload?.email) {
+      throw new UnauthorizedException('Google account did not provide an email address');
+    }
+
+    // Without this check anyone could register an unverified Google address that
+    // collides with a real customer's email and take over the account.
+    if (payload.email_verified === false) {
+      throw new UnauthorizedException('Your Google email address is not verified');
+    }
+
+    const email = payload.email.toLowerCase();
+    let customer = await this.findByEmail(email);
+
+    if (customer) {
+      if (!customer.isActive) {
+        throw new UnauthorizedException('Account is deactivated');
+      }
+      // Google has verified this address, so trust it over our own flag.
+      if (!customer.emailVerified) {
+        customer.emailVerified = true;
+        customer.emailVerificationToken = null;
+        customer = await this.customerRepository.save(customer);
+      }
+    } else {
+      const created = this.customerRepository.create({
+        email,
+        // No password: this account authenticates via Google. login() above
+        // rejects password attempts on such accounts with a clear message.
+        password: null,
+        firstName: payload.given_name || payload.name?.split(' ')[0] || 'Whisky',
+        lastName: payload.family_name || payload.name?.split(' ').slice(1).join(' ') || 'Lover',
+        profileImage: payload.picture || null,
+        isActive: true,
+        isVerified: false,
+        emailVerified: true,
+      });
+
+      customer = await this.customerRepository.save(created);
+
+      const displayName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'there';
+      this.emailService
+        .sendWelcomeEmail(customer.email, displayName, 'customer')
+        .catch(() => undefined);
+
+      this.notificationsService
+        .create({
+          customerId: customer.id,
+          type: NotificationType.WELCOME,
+          title: 'Welcome to Destination Whisky',
+          message:
+            'Your account is ready. Browse whisky bars, distillery tours, tastings, and events.',
+        })
+        .catch(() => undefined);
+    }
+
+    const token = this.generateToken(customer);
+    const { password, ...customerWithoutPassword } = customer;
+
+    return { customer: customerWithoutPassword as Customer, token };
   }
 
   private generateToken(customer: Customer): string {

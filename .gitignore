@@ -4,5 +4,20 @@ backend/.env
 .env.local
 .env.production
 .env.*.local
+# Env backups hold real credentials — the dated ones a swap script leaves behind
+# slip past the rules above, which is how a live Stripe key nearly got pushed.
+.env.backup*
+*/.env.backup*
+.env.*backup*
 *.dev.log
 **/.dev.log
+
+# Local tooling — belongs to this machine, not to the client's repo.
+# .claude/launch.json in particular accumulates dev-server entries for whatever
+# else is open on this machine, which is how unrelated project names and local
+# paths end up published in someone else's repository.
+.claude/
+.mcp.json
+karst.db
+karst.db-shm
+karst.db-wal

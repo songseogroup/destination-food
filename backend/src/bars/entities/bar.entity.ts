@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { SocialLink } from '../../common/dto/social-link.dto';
 
 @Entity('bars')
 export class Bar {
@@ -63,6 +64,14 @@ export class Bar {
   // Stripe before creating the order.
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   bookingDepositPerGuest: number;
+
+  /**
+   * Social + external links, e.g. Instagram, Facebook, YouTube, X, and `other`
+   * links such as a charity or GoFundMe page (named via `label`).
+   * See common/dto/social-link.dto.ts for the shape.
+   */
+  @Column('json', { nullable: true })
+  socialLinks: SocialLink[];
 
   @Column({ default: true })
   isActive: boolean;
