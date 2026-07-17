@@ -256,46 +256,209 @@ export class EmailService {
   /**
    * Email templates
    */
+  /**
+   * The site's palette, from project/lib/design-tokens.js — keep in sync.
+   *
+   * The emails had drifted into three different looks: a purple gradient left
+   * over from the original template, a green one, and a dark near-black theme
+   * with a lemon accent. None of them were the site's warm cream + bronze gold.
+   */
+  private static readonly C = {
+    gold: '#B8862F',
+    goldDeep: '#7B5620',
+    cream: '#FAF7F2',
+    white: '#FFFFFF',
+    border: '#EDE7DF',
+    ink: '#1A1614',
+    muted: '#585046',
+    faint: '#A99E8F',
+    chrome: '#14110F',
+    success: '#3F7D58',
+    danger: '#B4453A',
+    warning: '#C08A2E',
+  };
+
+  /**
+   * Serif for headings, sans for everything else — standing in for the site's
+   * Playfair Display and Inter. Web fonts can't be relied on in email (Outlook
+   * ignores @font-face entirely), so these are the closest ubiquitous stacks.
+   */
+  private static readonly SERIF = "Georgia,'Times New Roman',serif";
+  private static readonly SANS =
+    "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+  /** AUD. The site prices in A$; the emails said "$", which reads as USD. */
+  private money(amount: number | string): string {
+    const n = Number(amount);
+    return `A$${Number.isFinite(n) ? n.toFixed(2) : '0.00'}`;
+  }
+
+  private ref(orderId: number): string {
+    return `#${orderId.toString().padStart(6, '0')}`;
+  }
+
+  /** Where owners actually manage their business — the CMS, not the storefront. */
+  private adminUrl(path = ''): string {
+    const base = (this.configService.get<string>('CMS_ADMIN_URL') || 'http://localhost:3002').replace(
+      /\/+$/,
+      '',
+    );
+    return `${base}${path}`;
+  }
+
+  private siteUrl(path = ''): string {
+    const base = (this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000').replace(
+      /\/+$/,
+      '',
+    );
+    return `${base}${path}`;
+  }
+
+  /**
+   * The chrome every email shares: cream page, white card, gold rule, dark
+   * footer — the storefront's card language, rebuilt for mail clients.
+   *
+   * Tables and inline styles throughout: Outlook renders through Word and drops
+   * most of what a <style> block would carry, so nothing here relies on one.
+   */
+  private shell(opts: {
+    title: string;
+    /** The grey line clients preview next to the subject. */
+    preheader?: string;
+    eyebrow?: string;
+    heading: string;
+    /** Raw HTML for the message body. */
+    body: string;
+    cta?: { label: string; href: string };
+    footNote?: string;
+  }): string {
+    const C = EmailService.C;
+    const brand = this.configService.get<string>('BRAND_NAME') || 'Destination Whisky';
+    const year = new Date().getFullYear();
+
+    const ctaBlock = opts.cta
+      ? `
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 4px;">
+        <tr>
+          <td style="background:${C.gold};border-radius:999px;">
+            <a href="${opts.cta.href}" style="display:inline-block;padding:14px 32px;color:${C.white};font-family:${EmailService.SANS};font-weight:600;font-size:15px;text-decoration:none;border-radius:999px;">${opts.cta.label}</a>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:16px 0 0;font-family:${EmailService.SANS};font-size:12px;color:${C.faint};line-height:1.6;">
+        Button not working? Paste this into your browser:<br/>
+        <a href="${opts.cta.href}" style="color:${C.goldDeep};word-break:break-all;">${opts.cta.href}</a>
+      </p>`
+      : '';
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>${opts.title}</title>
+</head>
+<body style="margin:0;padding:0;background:${C.cream};">
+  ${
+    opts.preheader
+      ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${opts.preheader}</div>`
+      : ''
+  }
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.cream};padding:32px 16px;">
+    <tr><td align="center">
+
+      <!-- Wordmark -->
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;">
+        <tr><td align="center" style="padding-bottom:20px;">
+          <p style="margin:0;font-family:${EmailService.SERIF};font-size:20px;letter-spacing:4px;color:${C.ink};text-transform:uppercase;">Destination</p>
+          <p style="margin:2px 0 0;font-family:${EmailService.SANS};font-size:10px;font-weight:600;letter-spacing:6px;color:${C.gold};text-transform:uppercase;">Whisky</p>
+        </td></tr>
+      </table>
+
+      <!-- Card -->
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:${C.white};border:1px solid ${C.border};border-radius:20px;overflow:hidden;">
+        <tr><td style="height:4px;background:${C.gold};font-size:0;line-height:0;">&nbsp;</td></tr>
+        <tr><td style="padding:36px 36px 32px;">
+          ${
+            opts.eyebrow
+              ? `<p style="margin:0 0 10px;font-family:${EmailService.SANS};font-size:11px;font-weight:600;letter-spacing:2px;color:${C.gold};text-transform:uppercase;">${opts.eyebrow}</p>`
+              : ''
+          }
+          <h1 style="margin:0 0 18px;font-family:${EmailService.SERIF};font-size:27px;font-weight:400;color:${C.ink};line-height:1.25;">${opts.heading}</h1>
+          <div style="font-family:${EmailService.SANS};font-size:15px;color:${C.muted};line-height:1.65;">
+            ${opts.body}
+          </div>
+          ${ctaBlock}
+        </td></tr>
+      </table>
+
+      <!-- Footer -->
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;">
+        <tr><td align="center" style="padding:24px 16px 8px;">
+          ${
+            opts.footNote
+              ? `<p style="margin:0 0 12px;font-family:${EmailService.SANS};font-size:12px;color:${C.faint};line-height:1.6;">${opts.footNote}</p>`
+              : ''
+          }
+          <p style="margin:0;font-family:${EmailService.SANS};font-size:12px;color:${C.faint};line-height:1.6;">
+            &copy; ${year} ${brand}. Sydney, Australia.
+          </p>
+        </td></tr>
+      </table>
+
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  }
+
+  /** A bordered panel of label/value rows — the "details" block every email needs. */
+  private detailPanel(rows: Array<[string, string]>, accent?: string): string {
+    const C = EmailService.C;
+    const body = rows
+      .map(
+        ([label, value]) => `
+        <tr>
+          <td style="padding:8px 0;font-family:${EmailService.SANS};font-size:13px;color:${C.faint};white-space:nowrap;">${label}</td>
+          <td style="padding:8px 0;font-family:${EmailService.SANS};font-size:14px;color:${C.ink};font-weight:600;text-align:right;">${value}</td>
+        </tr>`,
+      )
+      .join('');
+    return `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;background:${C.cream};border:1px solid ${C.border};border-left:3px solid ${accent || C.gold};border-radius:12px;">
+        <tr><td style="padding:6px 20px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${body}</table>
+        </td></tr>
+      </table>`;
+  }
+
   private getBookingReceivedCustomerTemplate(
     name: string,
     orderId: number,
     listingName: string,
     amount: number,
   ): string {
-    const safeAmount = Number.isFinite(Number(amount)) ? Number(amount).toFixed(2) : '0.00';
-    return `
-      <!DOCTYPE html>
-      <html><head><meta charset="utf-8"><title>Booking received</title></head>
-      <body style="margin:0;padding:0;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;color:#f4f4f5;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:32px 16px;">
-          <tr><td align="center">
-            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#111;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;">
-              <tr><td style="padding:32px;text-align:center;background:linear-gradient(135deg,#0a0a0a,#1a1a1a);border-bottom:2px solid #eab308;">
-                <h1 style="margin:0;font-size:24px;font-weight:700;color:#fff;">Destination <span style="color:#eab308;">Whisky</span></h1>
-              </td></tr>
-              <tr><td style="padding:32px;">
-                <p style="margin:0 0 6px;font-size:20px;color:#fff;">Hi ${name},</p>
-                <p style="margin:0 0 18px;font-size:15px;color:#a1a1aa;line-height:1.6;">
-                  We've got your booking request for <strong style="color:#fff;">${listingName}</strong>. The venue is reviewing it right now — once they confirm, we'll send you your ticket.
-                </p>
-                <div style="background:#0a0a0a;border:1px solid #1f1f1f;border-radius:8px;padding:16px;margin:20px 0;">
-                  <p style="margin:0;font-size:13px;color:#71717a;">BOOKING REFERENCE</p>
-                  <p style="margin:4px 0 12px;font-size:22px;font-weight:700;color:#eab308;letter-spacing:2px;">#${orderId.toString().padStart(6, '0')}</p>
-                  <p style="margin:0;font-size:13px;color:#71717a;">Amount</p>
-                  <p style="margin:4px 0 0;font-size:18px;font-weight:600;color:#fff;">$${safeAmount}</p>
-                </div>
-                <p style="margin:0;font-size:13px;color:#71717a;line-height:1.6;">
-                  Confirmation usually arrives within a few hours. If you don't hear back within 24 hours, reply to this email and we'll chase the venue for you.
-                </p>
-              </td></tr>
-              <tr><td style="padding:18px 32px;background:#0a0a0a;border-top:1px solid #1f1f1f;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#52525b;">Booking ref #${orderId.toString().padStart(6, '0')} · Keep this email for your records</p>
-              </td></tr>
-            </table>
-          </td></tr>
-        </table>
-      </body></html>
-    `;
+    return this.shell({
+      title: 'Booking received',
+      preheader: `We've got your request for ${listingName} — awaiting confirmation.`,
+      eyebrow: 'Booking received',
+      heading: `Hi ${name}, we've got your booking`,
+      body: `
+        <p style="margin:0 0 4px;">
+          Your request for <strong style="color:${EmailService.C.ink};">${listingName}</strong> is with the venue now.
+          As soon as they confirm, we'll email your ticket.
+        </p>
+        ${this.detailPanel([
+          ['Booking reference', this.ref(orderId)],
+          ['Amount', this.money(amount)],
+          ['Status', 'Awaiting confirmation'],
+        ])}
+        <p style="margin:0;">
+          Confirmation usually arrives within a few hours. If you haven't heard back in 24 hours,
+          reply to this email and we'll chase it up for you.
+        </p>`,
+      footNote: `Booking ${this.ref(orderId)} · Keep this email for your records.`,
+    });
   }
 
   private getBookingTicketTemplate(
@@ -307,12 +470,11 @@ export class EmailService {
     bookingTime: string,
     guests: number,
   ): string {
-    const safeAmount = Number.isFinite(Number(amount)) ? Number(amount).toFixed(2) : '0.00';
-    const ref = `#${orderId.toString().padStart(6, '0')}`;
+    const C = EmailService.C;
     let dateStr = bookingDate;
     try {
       if (bookingDate) {
-        dateStr = new Date(bookingDate).toLocaleDateString(undefined, {
+        dateStr = new Date(bookingDate).toLocaleDateString('en-AU', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
@@ -322,203 +484,88 @@ export class EmailService {
     } catch {
       // keep raw
     }
-    return `
-      <!DOCTYPE html>
-      <html><head><meta charset="utf-8"><title>Your ticket</title></head>
-      <body style="margin:0;padding:0;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;color:#f4f4f5;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:32px 16px;">
-          <tr><td align="center">
-            <!-- Ticket card -->
-            <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#111;border:1px solid #2a2a2a;border-radius:18px;overflow:hidden;box-shadow:0 24px 48px rgba(234,179,8,0.08);">
-              <!-- Top stripe -->
-              <tr><td style="height:8px;background:linear-gradient(90deg,#eab308,#facc15,#eab308);"></td></tr>
-              <!-- Header -->
-              <tr><td style="padding:28px 32px 18px;text-align:center;">
-                <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:3px;color:#eab308;text-transform:uppercase;">Booking confirmed</p>
-                <h1 style="margin:8px 0 0;font-size:26px;font-weight:700;color:#fff;letter-spacing:-0.5px;">
-                  Destination <span style="color:#eab308;">Whisky</span>
-                </h1>
-              </td></tr>
-              <!-- Greeting -->
-              <tr><td style="padding:0 32px 12px;">
-                <p style="margin:0;font-size:16px;color:#fff;">Hi ${name},</p>
-                <p style="margin:6px 0 0;font-size:14px;color:#a1a1aa;line-height:1.5;">
-                  Your booking is confirmed. Show this ticket at the venue.
-                </p>
-              </td></tr>
-              <!-- Ticket body -->
-              <tr><td style="padding:18px 32px 8px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:12px;">
-                  <tr><td style="padding:24px;text-align:center;border-bottom:1px dashed #2a2a2a;">
-                    <p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:2px;color:#71717a;text-transform:uppercase;">${listingName}</p>
-                    <p style="margin:0;font-size:32px;font-weight:800;color:#eab308;letter-spacing:4px;">${ref}</p>
-                  </td></tr>
-                  <tr><td style="padding:20px 24px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td style="padding:6px 8px 6px 0;vertical-align:top;width:50%;">
-                          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1.5px;color:#71717a;text-transform:uppercase;">Date</p>
-                          <p style="margin:4px 0 0;font-size:15px;color:#fff;font-weight:500;">${dateStr || '—'}</p>
-                        </td>
-                        <td style="padding:6px 0 6px 8px;vertical-align:top;width:50%;">
-                          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1.5px;color:#71717a;text-transform:uppercase;">Time</p>
-                          <p style="margin:4px 0 0;font-size:15px;color:#fff;font-weight:500;">${bookingTime || '—'}</p>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding:14px 8px 6px 0;vertical-align:top;width:50%;">
-                          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1.5px;color:#71717a;text-transform:uppercase;">Guests</p>
-                          <p style="margin:4px 0 0;font-size:15px;color:#fff;font-weight:500;">${guests}</p>
-                        </td>
-                        <td style="padding:14px 0 6px 8px;vertical-align:top;width:50%;">
-                          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1.5px;color:#71717a;text-transform:uppercase;">Total paid</p>
-                          <p style="margin:4px 0 0;font-size:15px;color:#fff;font-weight:500;">$${safeAmount}</p>
-                        </td>
-                      </tr>
-                    </table>
-                  </td></tr>
-                </table>
-              </td></tr>
-              <!-- Footer note -->
-              <tr><td style="padding:18px 32px 24px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#52525b;line-height:1.5;">
-                  Bring this ticket on your phone or printed. Please arrive 10 minutes early.<br/>
-                  Reference: ${ref} · Need to cancel? Reply to this email.
-                </p>
-              </td></tr>
+
+    return this.shell({
+      title: 'Your ticket',
+      preheader: `Confirmed — ${listingName}. Reference ${this.ref(orderId)}.`,
+      eyebrow: 'Booking confirmed',
+      heading: `You're going to ${listingName}`,
+      body: `
+        <p style="margin:0 0 4px;">Hi ${name}, your booking is confirmed. Show this at the door.</p>
+
+        <!-- Ticket -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 8px;background:${C.cream};border:1px solid ${C.border};border-radius:16px;">
+          <tr><td style="padding:24px;text-align:center;border-bottom:1px dashed ${C.border};">
+            <p style="margin:0 0 6px;font-family:${EmailService.SANS};font-size:11px;font-weight:600;letter-spacing:2px;color:${C.faint};text-transform:uppercase;">${listingName}</p>
+            <p style="margin:0;font-family:${EmailService.SERIF};font-size:32px;color:${C.gold};letter-spacing:3px;">${this.ref(orderId)}</p>
+          </td></tr>
+          <tr><td style="padding:20px 24px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:6px 8px 6px 0;vertical-align:top;width:50%;">
+                  <p style="margin:0;font-family:${EmailService.SANS};font-size:11px;font-weight:600;letter-spacing:1.5px;color:${C.faint};text-transform:uppercase;">Date</p>
+                  <p style="margin:4px 0 0;font-family:${EmailService.SANS};font-size:15px;color:${C.ink};font-weight:600;">${dateStr || '—'}</p>
+                </td>
+                <td style="padding:6px 0 6px 8px;vertical-align:top;width:50%;">
+                  <p style="margin:0;font-family:${EmailService.SANS};font-size:11px;font-weight:600;letter-spacing:1.5px;color:${C.faint};text-transform:uppercase;">Time</p>
+                  <p style="margin:4px 0 0;font-family:${EmailService.SANS};font-size:15px;color:${C.ink};font-weight:600;">${bookingTime || '—'}</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:14px 8px 6px 0;vertical-align:top;">
+                  <p style="margin:0;font-family:${EmailService.SANS};font-size:11px;font-weight:600;letter-spacing:1.5px;color:${C.faint};text-transform:uppercase;">Guests</p>
+                  <p style="margin:4px 0 0;font-family:${EmailService.SANS};font-size:15px;color:${C.ink};font-weight:600;">${guests}</p>
+                </td>
+                <td style="padding:14px 0 6px 8px;vertical-align:top;">
+                  <p style="margin:0;font-family:${EmailService.SANS};font-size:11px;font-weight:600;letter-spacing:1.5px;color:${C.faint};text-transform:uppercase;">Total paid</p>
+                  <p style="margin:4px 0 0;font-family:${EmailService.SANS};font-size:15px;color:${C.ink};font-weight:600;">${this.money(amount)}</p>
+                </td>
+              </tr>
             </table>
           </td></tr>
-        </table>
-      </body></html>
-    `;
+        </table>`,
+      footNote: `Bring this on your phone or printed, and arrive 10 minutes early.<br/>Reference ${this.ref(orderId)} · Need to cancel? Reply to this email.`,
+    });
   }
 
   private getPasswordResetTemplate(name: string, resetUrl: string, expiresInMinutes: number): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Reset your Destination Whisky password</title>
-      </head>
-      <body style="margin:0;padding:0;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;color:#f4f4f5;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:32px 16px;">
-          <tr><td align="center">
-            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#111;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;">
-              <tr>
-                <td style="padding:40px 32px;text-align:center;background:linear-gradient(135deg,#0a0a0a 0%,#1a1a1a 100%);border-bottom:2px solid #eab308;">
-                  <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
-                    Destination <span style="color:#eab308;">Whisky</span>
-                  </h1>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:32px;">
-                  <p style="margin:0 0 12px;font-size:20px;color:#ffffff;">Hi ${name},</p>
-                  <p style="margin:0 0 20px;font-size:15px;color:#a1a1aa;line-height:1.6;">
-                    We received a request to reset the password on your Destination Whisky account.
-                    Click the button below to choose a new one. The link expires in <strong style="color:#eab308;">${expiresInMinutes} minutes</strong>.
-                  </p>
-
-                  <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:24px auto;">
-                    <tr>
-                      <td style="background:#eab308;border-radius:8px;">
-                        <a href="${resetUrl}" style="display:inline-block;padding:14px 32px;color:#000000;font-weight:600;font-size:15px;text-decoration:none;">
-                          Reset password
-                        </a>
-                      </td>
-                    </tr>
-                  </table>
-
-                  <p style="margin:24px 0 0;font-size:13px;color:#71717a;line-height:1.6;">
-                    Trouble with the button? Paste this link into your browser:<br/>
-                    <a href="${resetUrl}" style="color:#eab308;word-break:break-all;">${resetUrl}</a>
-                  </p>
-
-                  <p style="margin:24px 0 0;font-size:13px;color:#71717a;line-height:1.6;">
-                    If you didn't request this, you can safely ignore this email — your password won't change unless you click the link above and choose a new one.
-                  </p>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:24px 32px;background:#0a0a0a;border-top:1px solid #1f1f1f;text-align:center;">
-                  <p style="margin:0;font-size:12px;color:#52525b;">
-                    For your security, this link can only be used once and expires in ${expiresInMinutes} minutes.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </td></tr>
-        </table>
-      </body>
-      </html>
-    `;
+    return this.shell({
+      title: 'Reset your password',
+      preheader: `Your reset link expires in ${expiresInMinutes} minutes.`,
+      eyebrow: 'Password reset',
+      heading: `Hi ${name}, let's get you back in`,
+      body: `
+        <p style="margin:0;">
+          We received a request to reset your password. Choose a new one with the button below —
+          the link expires in <strong style="color:${EmailService.C.ink};">${expiresInMinutes} minutes</strong>.
+        </p>
+        <p style="margin:14px 0 0;">
+          If you didn't ask for this, ignore this email. Your password won't change unless you use the link.
+        </p>`,
+      cta: { label: 'Reset password', href: resetUrl },
+      footNote: `For your security this link works once, and expires in ${expiresInMinutes} minutes.`,
+    });
   }
 
   private getWelcomeEmailTemplate(name: string, audience: 'customer' | 'owner'): string {
-    const ctaUrl =
-      audience === 'owner'
-        ? this.configService.get<string>('CMS_ADMIN_URL') || 'https://destinationwhisky.com'
-        : this.configService.get<string>('FRONTEND_URL') || 'https://destinationwhisky.com';
-    const ctaLabel = audience === 'owner' ? 'Go to your dashboard' : 'Start exploring';
-    const intro =
-      audience === 'owner'
-        ? 'Your business owner account is ready. Head to your dashboard to set up your listing, upload photos, and connect Stripe so you can start accepting bookings.'
-        : 'Your account is ready. Browse premium whisky bars, distillery tours, tastings, and exclusive events — all in one place.';
-
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Welcome to Destination Whisky</title>
-      </head>
-      <body style="margin:0;padding:0;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;color:#f4f4f5;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:32px 16px;">
-          <tr><td align="center">
-            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#111;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;">
-              <tr>
-                <td style="padding:40px 32px;text-align:center;background:linear-gradient(135deg,#0a0a0a 0%,#1a1a1a 100%);border-bottom:2px solid #eab308;">
-                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
-                    Destination <span style="color:#eab308;">Whisky</span>
-                  </h1>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:32px;">
-                  <p style="margin:0 0 12px;font-size:20px;color:#ffffff;">Welcome, ${name} 👋</p>
-                  <p style="margin:0 0 24px;font-size:15px;color:#a1a1aa;line-height:1.6;">${intro}</p>
-
-                  <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:24px auto;">
-                    <tr>
-                      <td style="background:#eab308;border-radius:8px;">
-                        <a href="${ctaUrl}" style="display:inline-block;padding:14px 32px;color:#000000;font-weight:600;font-size:15px;text-decoration:none;">
-                          ${ctaLabel}
-                        </a>
-                      </td>
-                    </tr>
-                  </table>
-
-                  <p style="margin:24px 0 0;font-size:13px;color:#71717a;line-height:1.6;">
-                    Trouble with the button? Paste this link into your browser:<br/>
-                    <a href="${ctaUrl}" style="color:#eab308;word-break:break-all;">${ctaUrl}</a>
-                  </p>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:24px 32px;background:#0a0a0a;border-top:1px solid #1f1f1f;text-align:center;">
-                  <p style="margin:0;font-size:12px;color:#52525b;">
-                    You're receiving this because you signed up at Destination Whisky.<br/>
-                    If this wasn't you, you can safely ignore this email.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </td></tr>
-        </table>
-      </body>
-      </html>
-    `;
+    const isOwner = audience === 'owner';
+    return this.shell({
+      title: 'Welcome to Destination Whisky',
+      preheader: isOwner
+        ? 'Your owner account is ready — set up your listing.'
+        : 'Your account is ready — start exploring.',
+      eyebrow: 'Welcome',
+      heading: `Welcome, ${name}`,
+      body: `<p style="margin:0;">${
+        isOwner
+          ? 'Your business account is ready. Head to your dashboard to set up your listing, upload photos, and connect Stripe so you can start taking bookings.'
+          : 'Your account is ready. Browse whisky bars, distillery tours, tastings and events — all in one place.'
+      }</p>`,
+      cta: isOwner
+        ? { label: 'Go to your dashboard', href: this.adminUrl('/dashboard') }
+        : { label: 'Start exploring', href: this.siteUrl('/') },
+      footNote: `You're receiving this because you signed up at Destination Whisky.<br/>If this wasn't you, you can safely ignore this email.`,
+    });
   }
 
   private getBookingConfirmationTemplate(
@@ -529,47 +576,33 @@ export class EmailService {
     bookingDate: string,
     bookingTime: string,
   ): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .info-box { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #667eea; }
-          .amount { font-size: 24px; font-weight: bold; color: #667eea; }
-          .button { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Booking Confirmed!</h1>
-          </div>
-          <div class="content">
-            <p>Hi ${customerName},</p>
-            <p>Your booking has been confirmed. We're excited to have you join us!</p>
-            
-            <div class="info-box">
-              <h3>Booking Details</h3>
-              <p><strong>Order ID:</strong> #${orderId}</p>
-              <p><strong>Event:</strong> ${eventName}</p>
-              <p><strong>Date:</strong> ${new Date(bookingDate).toLocaleDateString()}</p>
-              <p><strong>Time:</strong> ${bookingTime}</p>
-              <p><strong>Amount Paid:</strong> <span class="amount">$${amount.toFixed(2)}</span></p>
-            </div>
-
-            <p>You will receive a reminder email closer to the event date.</p>
-            <p>If you have any questions, please don't hesitate to contact us.</p>
-            
-            <p>Best regards,<br>The ByFoods Team</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    let dateStr = bookingDate;
+    try {
+      if (bookingDate) dateStr = new Date(bookingDate).toLocaleDateString('en-AU');
+    } catch {
+      // keep raw
+    }
+    return this.shell({
+      title: 'Booking confirmed',
+      preheader: `${eventName} is confirmed.`,
+      eyebrow: 'Booking confirmed',
+      heading: `Hi ${customerName}, you're confirmed`,
+      body: `
+        <p style="margin:0 0 4px;">Your booking is confirmed — we're glad to have you.</p>
+        ${this.detailPanel(
+          [
+            ['Booking reference', this.ref(orderId)],
+            ['Experience', eventName],
+            ['Date', dateStr || '—'],
+            ['Time', bookingTime || '—'],
+            ['Amount paid', this.money(amount)],
+          ],
+          EmailService.C.success,
+        )}
+        <p style="margin:0;">We'll send a reminder closer to the date. Any questions, just reply to this email.</p>`,
+      cta: { label: 'View your booking', href: this.siteUrl(`/orders/${orderId}`) },
+      footNote: `Booking ${this.ref(orderId)}`,
+    });
   }
 
   private getBookingReceivedTemplate(
@@ -579,44 +612,25 @@ export class EmailService {
     amount: number,
     customerName: string,
   ): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .info-box { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #10b981; }
-          .amount { font-size: 24px; font-weight: bold; color: #10b981; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>New Booking Received!</h1>
-          </div>
-          <div class="content">
-            <p>Hi ${organizerName},</p>
-            <p>You have received a new booking for your event.</p>
-            
-            <div class="info-box">
-              <h3>Booking Details</h3>
-              <p><strong>Order ID:</strong> #${orderId}</p>
-              <p><strong>Event:</strong> ${eventName}</p>
-              <p><strong>Customer:</strong> ${customerName}</p>
-              <p><strong>Amount:</strong> <span class="amount">$${amount.toFixed(2)}</span></p>
-            </div>
-
-            <p>You can view and manage this booking in your dashboard.</p>
-            
-            <p>Best regards,<br>The ByFoods Team</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    return this.shell({
+      title: 'New booking received',
+      preheader: `${customerName} booked ${eventName}.`,
+      eyebrow: 'New booking',
+      heading: `Hi ${organizerName}, you have a new booking`,
+      body: `
+        <p style="margin:0 0 4px;">A customer has just booked one of your experiences.</p>
+        ${this.detailPanel(
+          [
+            ['Booking reference', this.ref(orderId)],
+            ['Experience', eventName],
+            ['Customer', customerName],
+            ['Amount', this.money(amount)],
+          ],
+          EmailService.C.success,
+        )}
+        <p style="margin:0;">Confirm or decline it from your dashboard.</p>`,
+      cta: { label: 'Open in dashboard', href: this.adminUrl(`/dashboard/orders/${orderId}`) },
+    });
   }
 
   private getRefundProcessedTemplate(
@@ -625,46 +639,29 @@ export class EmailService {
     amount: number,
     isCustomer: boolean,
   ): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .info-box { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #f59e0b; }
-          .amount { font-size: 24px; font-weight: bold; color: #f59e0b; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Refund Processed</h1>
-          </div>
-          <div class="content">
-            <p>Hi ${name},</p>
-            <p>A refund has been processed ${isCustomer ? 'for your order' : 'for order'}.</p>
-            
-            <div class="info-box">
-              <h3>Refund Details</h3>
-              <p><strong>Order ID:</strong> #${orderId}</p>
-              <p><strong>Refund Amount:</strong> <span class="amount">$${amount.toFixed(2)}</span></p>
-              <p><strong>Status:</strong> Completed</p>
-            </div>
-
-            ${isCustomer 
-              ? '<p>The refund will be processed to your original payment method within 5-10 business days.</p>'
-              : '<p>The refund has been processed and the customer will receive the amount in their original payment method.</p>'
-            }
-            
-            <p>Best regards,<br>The ByFoods Team</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    return this.shell({
+      title: 'Refund processed',
+      preheader: `${this.money(amount)} refunded on booking ${this.ref(orderId)}.`,
+      eyebrow: 'Refund processed',
+      heading: `Hi ${name}, a refund has gone through`,
+      body: `
+        ${this.detailPanel(
+          [
+            ['Booking reference', this.ref(orderId)],
+            ['Refund amount', this.money(amount)],
+            ['Status', 'Completed'],
+          ],
+          EmailService.C.warning,
+        )}
+        <p style="margin:0;">${
+          isCustomer
+            ? 'It will appear on your original payment method within 5–10 business days, depending on your bank.'
+            : "The customer will receive the amount on their original payment method within 5–10 business days."
+        }</p>`,
+      cta: isCustomer
+        ? { label: 'View your booking', href: this.siteUrl(`/orders/${orderId}`) }
+        : { label: 'Open in dashboard', href: this.adminUrl(`/dashboard/orders/${orderId}`) },
+    });
   }
 
   private getPayoutNotificationTemplate(
@@ -674,106 +671,73 @@ export class EmailService {
     status: string,
     rejectionReason?: string,
   ): string {
-    const statusColors: Record<string, string> = {
-      approved: '#10b981',
-      paid: '#10b981',
-      rejected: '#ef4444',
-      failed: '#ef4444',
+    const C = EmailService.C;
+    const accents: Record<string, string> = {
+      approved: C.success,
+      paid: C.success,
+      rejected: C.danger,
+      failed: C.danger,
     };
-
-    const statusMessages: Record<string, string> = {
+    const messages: Record<string, string> = {
       approved: 'Your payout request has been approved and is being processed.',
-      paid: 'Your payout has been successfully processed and transferred to your account.',
-      rejected: 'Your payout request has been rejected.',
-      failed: 'Your payout processing failed. Please contact support.',
+      paid: 'Your payout has been sent to your bank account.',
+      rejected: 'Your payout request was rejected.',
+      failed: 'Your payout could not be processed.',
     };
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+    const rows: Array<[string, string]> = [
+      ['Payout reference', `#${payoutId}`],
+      ['Amount', this.money(amount)],
+      ['Status', label],
+    ];
+    if (rejectionReason) rows.push(['Reason', rejectionReason]);
 
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, ${statusColors[status] || '#667eea'} 0%, ${statusColors[status] || '#764ba2'} 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .info-box { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid ${statusColors[status] || '#667eea'}; }
-          .amount { font-size: 24px; font-weight: bold; color: ${statusColors[status] || '#667eea'}; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Payout ${status.charAt(0).toUpperCase() + status.slice(1)}</h1>
-          </div>
-          <div class="content">
-            <p>Hi ${name},</p>
-            <p>${statusMessages[status]}</p>
-            
-            <div class="info-box">
-              <h3>Payout Details</h3>
-              <p><strong>Payout ID:</strong> #${payoutId}</p>
-              <p><strong>Amount:</strong> <span class="amount">$${amount.toFixed(2)}</span></p>
-              <p><strong>Status:</strong> ${status.charAt(0).toUpperCase() + status.slice(1)}</p>
-              ${rejectionReason ? `<p><strong>Reason:</strong> ${rejectionReason}</p>` : ''}
-            </div>
-
-            ${status === 'rejected' && rejectionReason 
-              ? '<p>If you have any questions about this decision, please contact our support team.</p>'
-              : ''
-            }
-            
-            <p>Best regards,<br>The ByFoods Team</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    return this.shell({
+      title: `Payout ${label.toLowerCase()}`,
+      preheader: `${this.money(amount)} — ${label.toLowerCase()}.`,
+      eyebrow: 'Payout',
+      heading: `Hi ${name}, your payout is ${label.toLowerCase()}`,
+      body: `
+        <p style="margin:0 0 4px;">${messages[status] || `Your payout status is now ${label.toLowerCase()}.`}</p>
+        ${this.detailPanel(rows, accents[status] || C.gold)}
+        ${
+          status === 'rejected' || status === 'failed'
+            ? `<p style="margin:0;">If you think this is a mistake, reply to this email and we'll take a look.</p>`
+            : ''
+        }`,
+      cta: { label: 'View payouts', href: this.adminUrl('/dashboard/finance/payouts') },
+    });
   }
 
-  private getKYCIncompleteTemplate(
-    name: string,
-    missingRequirements: string[],
-  ): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .info-box { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #f59e0b; }
-          .button { display: inline-block; padding: 12px 30px; background: #f59e0b; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
-          ul { list-style-type: disc; padding-left: 20px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Action Required: Complete Your Onboarding</h1>
-          </div>
-          <div class="content">
-            <p>Hi ${name},</p>
-            <p>To start receiving payouts, you need to complete your Stripe onboarding process.</p>
-            
-            <div class="info-box">
-              <h3>Missing Requirements</h3>
-              <ul>
-                ${missingRequirements.map(req => `<li>${req.replace(/_/g, ' ')}</li>`).join('')}
-              </ul>
-            </div>
+  private getKYCIncompleteTemplate(name: string, missingRequirements: string[]): string {
+    const C = EmailService.C;
+    const items = missingRequirements
+      .map(
+        (req) =>
+          `<li style="margin:0 0 6px;color:${C.ink};">${req.replace(/_/g, ' ')}</li>`,
+      )
+      .join('');
 
-            <p>Please complete these requirements in your dashboard to enable payouts.</p>
-            <a href="${this.configService.get('FRONTEND_URL')}/dashboard/finance" class="button">Complete Onboarding</a>
-            
-            <p>Best regards,<br>The ByFoods Team</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    return this.shell({
+      title: 'Finish your payout setup',
+      preheader: "You can't receive payouts until Stripe verification is complete.",
+      eyebrow: 'Action required',
+      heading: `Hi ${name}, your payout setup isn't finished`,
+      body: `
+        <p style="margin:0 0 4px;">
+          Until Stripe has verified your details, bookings can't be paid out to you —
+          and your listings can't take online bookings.
+        </p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;background:${C.cream};border:1px solid ${C.border};border-left:3px solid ${C.warning};border-radius:12px;">
+          <tr><td style="padding:18px 20px;">
+            <p style="margin:0 0 10px;font-family:${EmailService.SANS};font-size:11px;font-weight:600;letter-spacing:1.5px;color:${C.faint};text-transform:uppercase;">Still needed</p>
+            <ul style="margin:0;padding-left:18px;font-family:${EmailService.SANS};font-size:14px;line-height:1.7;">${items}</ul>
+          </td></tr>
+        </table>`,
+      // This used to point at FRONTEND_URL/dashboard/finance — a page that only
+      // exists in the admin portal, so owners landed on a 404 on the storefront.
+      cta: { label: 'Finish setup', href: this.adminUrl('/dashboard/finance') },
+    });
   }
 
   /**

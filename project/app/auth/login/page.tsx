@@ -1,15 +1,39 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react'
 import { useCustomerAuth } from '../../../contexts/CustomerAuthContext'
 import GoogleAuthButton, { AuthDivider } from '../../../components/GoogleAuthButton'
 import Logo from '../../../components/Logo'
 
+/**
+ * Where to land after signing in.
+ *
+ * Only same-site paths are honoured. `?next=https://evil.com` — or the
+ * protocol-relative `//evil.com`, which the browser also treats as absolute —
+ * would otherwise turn our login into an open redirect that phishing can point
+ * at, so anything that isn't a plain `/path` falls back to the homepage.
+ */
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/'
+  return raw
+}
+
 export default function LoginPage() {
+  return (
+    // useSearchParams needs a Suspense boundary to prerender.
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = safeNext(searchParams.get('next'))
   const { login } = useCustomerAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -24,7 +48,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password)
-      router.push('/')
+      router.push(next)
     } catch (err: any) {
       setError(err.message || 'Invalid email or password')
     } finally {
@@ -52,7 +76,7 @@ export default function LoginPage() {
         )}
 
         <div className="mt-6">
-          <GoogleAuthButton mode="signin" onError={setError} redirectTo="/" />
+          <GoogleAuthButton mode="signin" onError={setError} redirectTo={next} />
         </div>
 
         <AuthDivider />

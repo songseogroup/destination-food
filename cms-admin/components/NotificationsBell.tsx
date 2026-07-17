@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { Bell, CheckCheck, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -54,11 +55,8 @@ export function NotificationsBell() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [])
 
-  const markReadMutation = useMutation(
-    async (id: number) => (await api.patch(`/notifications/mine/${id}/read`)).data,
-    { onSuccess: () => queryClient.invalidateQueries('my-notifications') },
-  )
-
+  // Marking a single one read is the detail page's job now — opening it is what
+  // marks it, so the bell doesn't duplicate that.
   const markAllReadMutation = useMutation(
     async () => (await api.patch('/notifications/mine/read-all')).data,
     { onSuccess: () => queryClient.invalidateQueries('my-notifications') },
@@ -110,26 +108,40 @@ export function NotificationsBell() {
             ) : (
               <ul className="divide-y divide-gray-100">
                 {items.map((n) => (
-                  <li
-                    key={n.id}
-                    onClick={() => n.status === 'unread' && markReadMutation.mutate(n.id)}
-                    className={`px-4 py-3 cursor-pointer hover:bg-gray-50 ${
-                      n.status === 'unread' ? 'bg-primary-50/40' : ''
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                      {n.status === 'unread' && (
-                        <span className="mt-1 inline-block w-2 h-2 bg-primary-500 rounded-full flex-shrink-0" />
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-xs text-gray-600 line-clamp-2">{n.message}</p>
-                    <p className="mt-1 text-[11px] text-gray-400">{timeAgo(n.createdAt)}</p>
+                  <li key={n.id}>
+                    {/* A real link, not a div with a click handler: the row looked
+                        clickable but only marked itself read and went nowhere. */}
+                    <Link
+                      href={`/dashboard/notifications/${n.id}`}
+                      onClick={() => setOpen(false)}
+                      className={`block px-4 py-3 hover:bg-gray-50 ${
+                        n.status === 'unread' ? 'bg-primary-50/40' : ''
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-medium text-gray-900">{n.title}</p>
+                        {n.status === 'unread' && (
+                          <span className="mt-1 inline-block w-2 h-2 bg-primary-500 rounded-full flex-shrink-0" />
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-gray-600 line-clamp-2">{n.message}</p>
+                      <p className="mt-1 text-[11px] text-gray-400">{timeAgo(n.createdAt)}</p>
+                    </Link>
                   </li>
                 ))}
               </ul>
             )}
           </div>
+
+          {items.length > 0 && (
+            <Link
+              href="/dashboard/notifications"
+              onClick={() => setOpen(false)}
+              className="block border-t border-gray-100 px-4 py-3 text-center text-sm font-medium text-primary-700 hover:bg-gray-50"
+            >
+              View all notifications
+            </Link>
+          )}
         </div>
       )}
     </div>

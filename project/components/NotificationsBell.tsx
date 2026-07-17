@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { Bell, CheckCheck, Loader2 } from 'lucide-react'
 import { api } from '../lib/api'
 import { useCustomerAuth } from '../contexts/CustomerAuthContext'
@@ -70,13 +71,8 @@ export default function NotificationsBell() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [])
 
-  const markRead = async (id: number) => {
-    try {
-      await api.patch(`/customers/notifications/mine/${id}/read`)
-      fetchNotifications()
-    } catch {}
-  }
-
+  // Marking a single one read is the detail page's job now — opening it is what
+  // marks it, so the bell doesn't duplicate that.
   const markAllRead = async () => {
     try {
       await api.patch('/customers/notifications/mine/read-all')
@@ -135,26 +131,40 @@ export default function NotificationsBell() {
             ) : (
               <ul className="divide-y divide-charcoal-200">
                 {items.map((n) => (
-                  <li
-                    key={n.id}
-                    onClick={() => n.status === 'unread' && markRead(n.id)}
-                    className={`px-4 py-3 cursor-pointer transition-colors hover:bg-charcoal-50 ${
-                      n.status === 'unread' ? 'bg-whisky-50' : ''
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-ink">{n.title}</p>
-                      {n.status === 'unread' && (
-                        <span className="mt-1 inline-block w-2 h-2 bg-whisky-500 rounded-full flex-shrink-0" />
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-xs text-charcoal-600 line-clamp-2">{n.message}</p>
-                    <p className="mt-1 text-[11px] text-charcoal-400">{timeAgo(n.createdAt)}</p>
+                  <li key={n.id}>
+                    {/* A real link, not a div with a click handler: the row looked
+                        clickable but only marked itself read and went nowhere. */}
+                    <Link
+                      href={`/notifications/${n.id}`}
+                      onClick={() => setOpen(false)}
+                      className={`block px-4 py-3 transition-colors hover:bg-charcoal-50 ${
+                        n.status === 'unread' ? 'bg-whisky-50' : ''
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-medium text-ink">{n.title}</p>
+                        {n.status === 'unread' && (
+                          <span className="mt-1 inline-block w-2 h-2 bg-whisky-500 rounded-full flex-shrink-0" />
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-charcoal-600 line-clamp-2">{n.message}</p>
+                      <p className="mt-1 text-[11px] text-charcoal-400">{timeAgo(n.createdAt)}</p>
+                    </Link>
                   </li>
                 ))}
               </ul>
             )}
           </div>
+
+          {items.length > 0 && (
+            <Link
+              href="/notifications"
+              onClick={() => setOpen(false)}
+              className="block border-t border-charcoal-200 px-4 py-3 text-center text-sm font-medium text-whisky-700 transition-colors hover:bg-charcoal-50"
+            >
+              View all notifications
+            </Link>
+          )}
         </div>
       )}
     </div>

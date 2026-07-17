@@ -15,6 +15,8 @@ import { Refund, RefundStatus, RefundType } from '../stripe/entities/refund.enti
 import { TransactionLedger, TransactionStatus, TransactionType } from '../stripe/entities/transaction-ledger.entity';
 import { EmailService } from '../email/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { StripeService } from '../stripe/stripe.service';
+import { StripeAccountStatus } from '../stripe/entities/stripe-account.entity';
 import { NotificationType } from '../stripe/entities/notification.entity';
 
 @Injectable()
@@ -36,6 +38,7 @@ export class OrdersService {
     private transactionLedgerRepository: Repository<TransactionLedger>,
     private emailService: EmailService,
     private notificationsService: NotificationsService,
+    private stripeService: StripeService,
   ) {}
 
   /** Returns the listing the order is attached to plus its owner. */
@@ -53,6 +56,38 @@ export class OrdersService {
       return { listing: e, name: e?.name || 'Event', ownerUserId: e?.userId };
     }
     return { listing: null, name: 'your booking', ownerUserId: undefined };
+  }
+
+  /**
+   * Refuse a booking before it exists if the host can't actually be paid.
+   *
+   * createPaymentIntent already refuses these — but only after create() has
+   * saved the order, emailed the customer "booking received" and notified the
+   * owner. The customer ends up holding a confirmation email for a booking that
+   * can never be paid for. Checking here means they get one honest error and
+   * nothing is written or sent.
+   *
+   * Only event bookings and distillery tours settle through Stripe Connect; bar
+   * reservations don't, so they never reach this.
+   */
+  private async assertHostCanBePaid(hostUserId: number | undefined, listingName: string) {
+    let enabled = false;
+    if (hostUserId) {
+      try {
+        // getAccountStatus re-reads from Stripe rather than trusting our stored
+        // column, so a host who finished onboarding a minute ago isn't blocked.
+        const account = await this.stripeService.getAccountStatus(hostUserId);
+        enabled = account.status === StripeAccountStatus.ENABLED;
+      } catch {
+        // No Stripe account at all — never onboarded.
+        enabled = false;
+      }
+    }
+    if (!enabled) {
+      throw new BadRequestException(
+        `${listingName} isn't accepting online bookings yet — the host is still finishing their payment setup. Nothing has been charged. Please try again later.`,
+      );
+    }
   }
 
   async create(createOrderDto: CreateOrderDto, customerId: number): Promise<Order> {
@@ -84,11 +119,13 @@ export class OrdersService {
       if (!distillery) {
         throw new NotFoundException('Distillery not found');
       }
+      await this.assertHostCanBePaid(distillery.userId, distillery.name);
     } else if (createOrderDto.orderType === 'event_booking' && createOrderDto.eventId) {
       const event = await this.eventRepository.findOne({ where: { id: createOrderDto.eventId } });
       if (!event) {
         throw new NotFoundException('Event not found');
       }
+      await this.assertHostCanBePaid(event.userId, event.name);
     } else {
       throw new BadRequestException('Invalid order type or missing entity ID');
     }

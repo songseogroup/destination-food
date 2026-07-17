@@ -12,12 +12,17 @@ import { Refund } from '../stripe/entities/refund.entity';
 import { TransactionLedger } from '../stripe/entities/transaction-ledger.entity';
 import { EmailModule } from '../email/email.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { StripeModule } from '../stripe/stripe.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, Bar, Distillery, Event, Customer, Refund, TransactionLedger]),
     EmailModule,
     NotificationsModule,
+    // For the pre-flight check that the host can actually be paid before we
+    // create an order and email the customer about it. StripeModule doesn't
+    // import this one, so there's no cycle.
+    StripeModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

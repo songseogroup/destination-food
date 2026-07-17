@@ -74,6 +74,20 @@ export class NotificationsService {
     return this.repo.count({ where: { customerId, status: NotificationStatus.UNREAD } });
   }
 
+  /**
+   * One notification, scoped to whoever it belongs to. Someone else's row and a
+   * row that doesn't exist both come back as 404 — the caller can't tell them
+   * apart, so this can't be used to probe which notification ids exist.
+   */
+  async findOneFor(id: number, opts: { userId?: number; customerId?: number }) {
+    const where: any = { id };
+    if (opts.userId) where.userId = opts.userId;
+    if (opts.customerId) where.customerId = opts.customerId;
+    const notification = await this.repo.findOne({ where });
+    if (!notification) throw new NotFoundException('Notification not found');
+    return notification;
+  }
+
   async markRead(id: number, opts: { userId?: number; customerId?: number }) {
     const where: any = { id };
     if (opts.userId) where.userId = opts.userId;
