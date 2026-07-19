@@ -25,7 +25,6 @@ import {
   Users,
   Image as ImageIcon,
   Store,
-  Rocket,
 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { roleLabels } from '@/lib/roles'
@@ -41,7 +40,6 @@ const isActiveRoute = (pathname: string, href: string) => {
 
 const superAdminNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Phase 1 Report', href: '/dashboard/admin/phase-1', icon: Rocket },
   { name: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp },
   { name: 'Homepage', href: '/dashboard/homepage', icon: Home },
   { name: 'Banners', href: '/dashboard/admin/banners', icon: ImageIcon },
@@ -57,6 +55,7 @@ const superAdminNavigation = [
   { name: 'Review Moderation', href: '/dashboard/admin/reviews', icon: Star },
   { name: 'Customer Feedback', href: '/dashboard/admin/feedback', icon: ShieldCheck },
   { name: 'Platform Pricing', href: '/dashboard/admin/pricing', icon: DollarSign },
+  { name: 'Platform Revenue', href: '/dashboard/admin/platform-revenue', icon: DollarSign },
   { name: 'Payout Review', href: '/dashboard/admin/payouts', icon: ShieldCheck },
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },

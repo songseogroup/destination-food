@@ -199,6 +199,13 @@ export class StripeController {
     return await this.stripeService.markNotificationAsRead(parseInt(id), req.user.id);
   }
 
+  @Get('admin/platform-financials')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Platform-wide financials / P&L (SuperAdmin)' })
+  async getPlatformFinancials() {
+    return this.stripeService.getPlatformFinancials();
+  }
+
   @Get('financial-summary')
   @Roles(UserRole.EVENT_HOST, UserRole.TOUR_OPERATOR, UserRole.DISTILLERY, UserRole.BAR, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get financial summary' })

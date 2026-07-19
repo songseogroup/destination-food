@@ -1346,6 +1346,195 @@ export class StripeService {
     };
   }
 
+  /**
+   * Platform-wide financials for the SuperAdmin — the whole business's P&L.
+   *
+   * getFinancialSummary is scoped to one user (an operator's own money); this is
+   * the aggregate across everyone, which is what the platform owner needs to see
+   * where the money is made and lost.
+   *
+   * Refunds are stored as negative rows (amount, platformFee and organizerEarnings
+   * all negated), so a plain SUM over payments + refunds already nets them out —
+   * platformRevenue below is genuinely what Destination Whisky keeps after refunds.
+   * (It's DW's commission + booking fees; Stripe's own processing fees are passed
+   * to operators and aren't a DW cost here.)
+   */
+  async getPlatformFinancials() {
+    const sum = async (
+      field: 'amount' | 'platformFee' | 'organizerEarnings',
+      types: TransactionType[],
+      absolute = false,
+    ): Promise<number> => {
+      const expr = absolute ? `ABS(t.${field})` : `t.${field}`;
+      const row = await this.transactionLedgerRepository
+        .createQueryBuilder('t')
+        .select(`COALESCE(SUM(${expr}), 0)`, 'v')
+        .where('t.type IN (:...types)', { types })
+        .andWhere('t.status = :status', { status: TransactionStatus.COMPLETED })
+        .getRawOne();
+      return parseFloat(row?.v ?? '0') || 0;
+    };
+    const countOf = async (types: TransactionType[]): Promise<number> => {
+      const row = await this.transactionLedgerRepository
+        .createQueryBuilder('t')
+        .select('COUNT(*)', 'c')
+        .where('t.type IN (:...types)', { types })
+        .andWhere('t.status = :status', { status: TransactionStatus.COMPLETED })
+        .getRawOne();
+      return parseInt(row?.c ?? '0', 10) || 0;
+    };
+
+    const P = [TransactionType.PAYMENT];
+    const R = [TransactionType.REFUND];
+    const PR = [TransactionType.PAYMENT, TransactionType.REFUND];
+
+    const grossBookings = await sum('amount', P); // before refunds
+    const platformRevenue = await sum('platformFee', PR); // DW keep, net of refunds
+    const platformRevenueGross = await sum('platformFee', P);
+    const operatorEarnings = await sum('organizerEarnings', PR);
+    const totalRefunds = await sum('amount', R, true); // positive magnitude
+    const totalPayouts = await sum('amount', [TransactionType.PAYOUT], true);
+    const paymentCount = await countOf(P);
+    const refundCount = await countOf(R);
+
+    const pendingPayouts = await this.payoutRepository.find({
+      where: { status: PayoutStatus.PENDING_SUPER_ADMIN_APPROVAL },
+    });
+    const pendingPayoutAmount = pendingPayouts.reduce(
+      (s, p) => s + (parseFloat(p.amount.toString()) || 0),
+      0,
+    );
+
+    // Top earning operators — grouped payments, net of their refunds, with names.
+    const topRaw = await this.transactionLedgerRepository
+      .createQueryBuilder('t')
+      .select('t.userId', 'userId')
+      .addSelect('COALESCE(SUM(t.amount), 0)', 'gross')
+      .addSelect('COALESCE(SUM(t.platformFee), 0)', 'platformTake')
+      .where('t.type IN (:...types)', { types: PR })
+      .andWhere('t.status = :status', { status: TransactionStatus.COMPLETED })
+      .andWhere('t.userId IS NOT NULL')
+      .groupBy('t.userId')
+      .orderBy('gross', 'DESC')
+      .limit(10)
+      .getRawMany();
+    const topUserIds = topRaw.map((r) => parseInt(r.userId, 10)).filter(Boolean);
+    const topUsers = topUserIds.length
+      ? await this.userRepository.findByIds(topUserIds)
+      : [];
+    const nameFor = (id: number) => {
+      const u = topUsers.find((x) => x.id === id);
+      if (!u) return `User #${id}`;
+      return (
+        [u.firstName, u.lastName].filter(Boolean).join(' ') ||
+        (u as any).businessName ||
+        u.email ||
+        `User #${id}`
+      );
+    };
+    const topEarners = topRaw.map((r) => ({
+      userId: parseInt(r.userId, 10),
+      name: nameFor(parseInt(r.userId, 10)),
+      grossBookings: parseFloat(r.gross) || 0,
+      platformRevenue: parseFloat(r.platformTake) || 0,
+    }));
+
+    // This month vs last month (platform revenue), for a direction of travel.
+    const now = new Date();
+    const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const revenueSince = async (from: Date, to?: Date): Promise<number> => {
+      const qb = this.transactionLedgerRepository
+        .createQueryBuilder('t')
+        .select('COALESCE(SUM(t.platformFee), 0)', 'v')
+        .where('t.type IN (:...types)', { types: PR })
+        .andWhere('t.status = :status', { status: TransactionStatus.COMPLETED })
+        .andWhere('t.createdAt >= :from', { from });
+      if (to) qb.andWhere('t.createdAt < :to', { to });
+      const row = await qb.getRawOne();
+      return parseFloat(row?.v ?? '0') || 0;
+    };
+    const thisMonthRevenue = await revenueSince(startThisMonth);
+    const lastMonthRevenue = await revenueSince(startLastMonth, startThisMonth);
+
+    // Monthly trend — last 8 months, so a chart has a real curve to draw. Grouped
+    // in SQL, then poured into an 8-slot skeleton so empty months render as zero
+    // rather than gaps.
+    const since8 = new Date(now.getFullYear(), now.getMonth() - 7, 1);
+    const monthlyRaw = await this.transactionLedgerRepository
+      .createQueryBuilder('t')
+      .select("to_char(date_trunc('month', t.\"createdAt\"), 'YYYY-MM')", 'month')
+      .addSelect('COALESCE(SUM(t.amount), 0)', 'gross')
+      .addSelect('COALESCE(SUM(t."platformFee"), 0)', 'revenue')
+      .where('t.type IN (:...types)', { types: PR })
+      .andWhere('t.status = :status', { status: TransactionStatus.COMPLETED })
+      .andWhere('t."createdAt" >= :since', { since: since8 })
+      .groupBy('month')
+      .getRawMany();
+    const monthlyMap = new Map(monthlyRaw.map((r) => [r.month, r]));
+    const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthlySeries: Array<{ key: string; label: string; gross: number; revenue: number }> = [];
+    for (let i = 7; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const hit = monthlyMap.get(key);
+      monthlySeries.push({
+        key,
+        label: monthLabels[d.getMonth()],
+        gross: parseFloat(hit?.gross ?? '0') || 0,
+        revenue: parseFloat(hit?.revenue ?? '0') || 0,
+      });
+    }
+
+    // Revenue by listing type — bars vs distilleries vs events. Joins each ledger
+    // row to its order to read the order type.
+    const typeRaw = await this.transactionLedgerRepository
+      .createQueryBuilder('t')
+      .leftJoin('orders', 'o', 'o.id = t."orderId"')
+      .select('o."orderType"', 'orderType')
+      .addSelect('COALESCE(SUM(t.amount), 0)', 'gross')
+      .addSelect('COALESCE(SUM(t."platformFee"), 0)', 'revenue')
+      .where('t.type IN (:...types)', { types: PR })
+      .andWhere('t.status = :status', { status: TransactionStatus.COMPLETED })
+      .andWhere('t."orderId" IS NOT NULL')
+      .groupBy('o."orderType"')
+      .getRawMany();
+    const typeBucket = { bar: 0, distillery: 0, event: 0 };
+    const typeRevenue = { bar: 0, distillery: 0, event: 0 };
+    for (const r of typeRaw) {
+      const g = parseFloat(r.gross) || 0;
+      const rev = parseFloat(r.revenue) || 0;
+      if (r.orderType === 'bar_reservation') { typeBucket.bar += g; typeRevenue.bar += rev; }
+      else if (r.orderType === 'distillery_tour') { typeBucket.distillery += g; typeRevenue.distillery += rev; }
+      else if (r.orderType === 'event_booking') { typeBucket.event += g; typeRevenue.event += rev; }
+    }
+    const byListingType = [
+      { type: 'Bars', gross: typeBucket.bar, revenue: typeRevenue.bar },
+      { type: 'Distilleries', gross: typeBucket.distillery, revenue: typeRevenue.distillery },
+      { type: 'Events', gross: typeBucket.event, revenue: typeRevenue.event },
+    ];
+
+    return {
+      monthlySeries,
+      byListingType,
+      grossBookings,
+      platformRevenue,
+      platformRevenueGross,
+      operatorEarnings,
+      totalRefunds,
+      refundCount,
+      totalPayouts,
+      pendingPayoutAmount,
+      pendingPayoutCount: pendingPayouts.length,
+      paymentCount,
+      averageBookingValue: paymentCount ? grossBookings / paymentCount : 0,
+      refundRate: paymentCount ? refundCount / paymentCount : 0,
+      thisMonthRevenue,
+      lastMonthRevenue,
+      topEarners,
+    };
+  }
+
   async getPricingConfig() {
     const config = await this.getOrCreatePricingConfig();
     return {

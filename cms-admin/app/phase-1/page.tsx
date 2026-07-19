@@ -1,16 +1,14 @@
-import type { Metadata } from 'next'
 import { CheckCircle2 } from 'lucide-react'
 
 /**
- * Public Phase 1 status report — a shareable, no-login page for the client.
+ * Standalone Phase 1 report — top-level route (portal.destinationwhisky.life/phase-1).
  *
- * Deliberately unlisted: robots noindex keeps it out of search, and nothing
- * links to it, so it's reachable only by the person the URL is sent to. Meant to
- * be temporary — delete this file once the client has seen it.
+ * Sits outside /dashboard on purpose, so it renders on its own with no sidebar,
+ * no nav and no login wall — the URL shows the report and nothing else. Kept out
+ * of search with robots noindex; nothing links to it.
  */
-export const metadata: Metadata = {
+export const metadata = {
   title: 'Destination Whisky — Phase 1 Build Report',
-  description: 'Phase 1 developer build status for Destination Whisky.',
   robots: { index: false, follow: false },
 }
 
@@ -29,16 +27,8 @@ const MODULES: Module[] = [
     n: 1,
     title: 'Listings & Operator Self-Serve',
     features: [
-      {
-        name: 'Create Listing',
-        detail:
-          'Operator self-listing form — Bar / Distillery / Tour / Event, with core, experience and media fields and draft / published / unpublished status.',
-      },
-      {
-        name: 'Claim Listing Flow',
-        detail:
-          '“Claim this listing” on unowned listings, manual admin verification, approval hands over edit + booking access.',
-      },
+      { name: 'Create Listing', detail: 'Operator self-listing form — Bar / Distillery / Tour / Event, with core, experience and media fields and draft / published / unpublished status.' },
+      { name: 'Claim Listing Flow', detail: '“Claim this listing” on unowned listings, manual admin verification, approval hands over edit + booking access.' },
     ],
   },
   {
@@ -47,11 +37,7 @@ const MODULES: Module[] = [
     features: [
       { name: 'Global Search', detail: 'Across listing name, location and category.' },
       { name: 'Filters', detail: 'Country, city, listing type, and rating (4.5+ / 4+ / 3+).' },
-      {
-        name: 'City / Country Landing Pages',
-        detail:
-          'Dedicated destination pages with top-rated, most-reviewed and trending shelves, and per-page SEO metadata.',
-      },
+      { name: 'City / Country Landing Pages', detail: 'Dedicated destination pages with top-rated, most-reviewed and trending shelves, and per-page SEO metadata.' },
     ],
   },
   {
@@ -61,10 +47,7 @@ const MODULES: Module[] = [
       { name: 'Star Rating System', detail: 'Whole-star 1–5, with average and count on cards and pages.' },
       { name: 'Write a Review Flow', detail: 'Required star rating plus optional text, visit context and booking source.' },
       { name: 'Review Display', detail: 'Most-recent sort, report action, and optional operator public reply.' },
-      {
-        name: 'Eligibility Logic',
-        detail: 'Reviews limited to guests who completed a booking, or an admin-verified visit.',
-      },
+      { name: 'Eligibility Logic', detail: 'Reviews limited to guests who completed a booking, or an admin-verified visit.' },
     ],
   },
   {
@@ -72,10 +55,7 @@ const MODULES: Module[] = [
     title: 'Review Moderation & Fraud Flags',
     features: [
       { name: 'Report Review Workflow', detail: 'Reasons (spam / harassment / fake / other) and visible / pending / removed states.' },
-      {
-        name: 'Fraud / Risk Flagging',
-        detail: 'Automatic flags for a burst of reviews from one source or a spike of 5★ on a listing, with privacy-preserving fingerprints.',
-      },
+      { name: 'Fraud / Risk Flagging', detail: 'Automatic flags for a burst of reviews from one source or a spike of 5★ on a listing, with privacy-preserving fingerprints.' },
       { name: 'Admin Moderation Panel', detail: 'Flagged-review queue with hide / approve / remove.' },
     ],
   },
@@ -83,10 +63,7 @@ const MODULES: Module[] = [
     n: 5,
     title: 'Badges (Auto-Award, Data-Based)',
     features: [
-      {
-        name: 'Badge Engine',
-        detail: 'Trending this month, Most reviewed, Top-rated in [City], Community favourite — all from real activity.',
-      },
+      { name: 'Badge Engine', detail: 'Trending this month, Most reviewed, Top-rated in [City], Community favourite — all from real activity.' },
       { name: 'Badge Display', detail: 'On listing cards and pages, with a “community ratings and activity” tooltip.' },
       { name: 'Integrity Rules', detail: 'Cannot be bought or assigned; recomputed automatically and revoked when metrics fall.' },
     ],
@@ -166,40 +143,21 @@ const DEFINITION_OF_DONE = [
   'Badges auto-award and display correctly',
 ]
 
-const HOW = [
-  {
-    title: 'Verified end-to-end',
-    body: 'The core flows were driven against the real data model — booking capacity under simultaneous bookings, badge award and revocation, review eligibility, and the full report-and-moderate loop.',
-  },
-  {
-    title: 'Security hardening',
-    body: 'A dedicated hardening pass added rate limiting, security headers, input validation, image-upload restrictions and dependency updates across the platform.',
-  },
-  {
-    title: 'Built to grow',
-    body: 'Phase 2 revenue streams and features slot on top of this foundation without reworking it — the data model and booking, review and payout flows are already in place.',
-  },
-]
-
-export default function Phase1ReportPage() {
+export default function Phase1StandalonePage() {
   const featureCount = MODULES.reduce((n, m) => n + m.features.length, 0)
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen bg-gray-50">
       <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
         {/* Hero */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1A1614] via-[#2b2018] to-[#3a2a14] px-6 py-12 text-white sm:px-10">
-          <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-whisky-500/25 blur-3xl" />
+          <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-primary-500/20 blur-3xl" />
           <div className="relative">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-whisky-300">
-              Destination Whisky
-            </p>
-            <h1 className="mt-3 font-display text-4xl font-bold leading-tight sm:text-5xl">
-              Phase 1 — Build Report
-            </h1>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary-300">Destination Whisky</p>
+            <h1 className="mt-3 font-display text-4xl font-bold leading-tight sm:text-5xl">Phase 1 — Build Report</h1>
             <p className="mt-4 max-w-2xl text-lg text-white/70">
-              First iteration. Every module in the Phase 1 build list is implemented, wired
-              end-to-end, and verified against the live data model.
+              First iteration. Every module in the Phase 1 build list is implemented, wired end-to-end,
+              and verified against the live data model.
             </p>
             <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-green-500/15 px-4 py-2 text-sm font-semibold text-green-300 ring-1 ring-green-400/30">
               <CheckCircle2 className="h-4 w-4" />
@@ -216,21 +174,21 @@ export default function Phase1ReportPage() {
             { label: 'Completion', value: '100%' },
             { label: 'Definition of Done', value: '7 / 7' },
           ].map((s) => (
-            <div key={s.label} className="rounded-2xl border border-charcoal-200 bg-white p-5 text-center shadow-soft">
-              <p className="font-display text-3xl font-bold text-whisky-700">{s.value}</p>
-              <p className="mt-1 text-sm text-charcoal-500">{s.label}</p>
+            <div key={s.label} className="rounded-2xl border border-gray-200 bg-white p-5 text-center shadow-sm">
+              <p className="font-display text-3xl font-bold text-primary-600">{s.value}</p>
+              <p className="mt-1 text-sm text-gray-500">{s.label}</p>
             </div>
           ))}
         </div>
 
         {/* Definition of Done */}
-        <section className="mt-8 rounded-2xl border border-charcoal-200 bg-white p-6 shadow-soft">
-          <h2 className="mb-4 font-display text-xl font-bold text-ink">Phase 1 — Definition of Done</h2>
+        <section className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 font-display text-xl font-bold text-gray-900">Phase 1 — Definition of Done</h2>
           <ul className="grid gap-3 sm:grid-cols-2">
             {DEFINITION_OF_DONE.map((item) => (
               <li key={item} className="flex items-start gap-2.5 rounded-xl bg-green-50 px-3.5 py-2.5">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
-                <span className="text-sm text-charcoal-700">{item}</span>
+                <span className="text-sm text-gray-800">{item}</span>
               </li>
             ))}
           </ul>
@@ -238,23 +196,23 @@ export default function Phase1ReportPage() {
 
         {/* Modules */}
         <section className="mt-8">
-          <h2 className="mb-4 font-display text-xl font-bold text-ink">The build list, module by module</h2>
+          <h2 className="mb-4 font-display text-xl font-bold text-gray-900">The build list, module by module</h2>
           <div className="space-y-4">
             {MODULES.map((m) => (
-              <div key={m.n} className="overflow-hidden rounded-2xl border border-charcoal-200 bg-white shadow-soft">
-                <div className="flex items-center gap-3 border-b border-charcoal-100 px-5 py-4">
-                  <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-whisky-500 text-sm font-bold text-white">
+              <div key={m.n} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4">
+                  <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary-500 text-sm font-bold text-white">
                     {m.n}
                   </span>
-                  <h3 className="font-display text-lg font-semibold text-ink">{m.title}</h3>
+                  <h3 className="font-display text-lg font-semibold text-gray-900">{m.title}</h3>
                 </div>
-                <ul className="divide-y divide-charcoal-100">
+                <ul className="divide-y divide-gray-100">
                   {m.features.map((f) => (
                     <li key={f.name} className="flex items-start gap-3 px-5 py-3.5">
                       <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
                       <div>
-                        <p className="font-medium text-ink">{f.name}</p>
-                        <p className="mt-0.5 text-sm leading-relaxed text-charcoal-600">{f.detail}</p>
+                        <p className="font-medium text-gray-900">{f.name}</p>
+                        <p className="mt-0.5 text-sm leading-relaxed text-gray-600">{f.detail}</p>
                       </div>
                     </li>
                   ))}
@@ -264,46 +222,31 @@ export default function Phase1ReportPage() {
           </div>
         </section>
 
-        {/* How it was built */}
-        <section className="mt-8">
-          <h2 className="mb-4 font-display text-xl font-bold text-ink">How it was built</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            {HOW.map((h) => (
-              <div key={h.title} className="rounded-2xl border border-charcoal-200 bg-white p-5 shadow-soft">
-                <h3 className="font-semibold text-ink">{h.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-charcoal-600">{h.body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* A note from the developer — the scope/budget context + a light bonus ask. */}
+        {/* A note from the team — scope/budget context + a light bonus ask. */}
         <section className="mt-8 overflow-hidden rounded-3xl bg-gradient-to-br from-[#1A1614] via-[#2b2018] to-[#3a2a14] px-6 py-8 text-white sm:px-10">
-          <div className="flex items-center gap-2 text-whisky-300">
+          <div className="flex items-center gap-2 text-primary-300">
             <span className="text-2xl">🥃</span>
-            <h2 className="font-display text-xl font-bold">A note from the developer</h2>
+            <h2 className="font-display text-xl font-bold">A note from the team</h2>
           </div>
           <div className="mt-4 max-w-2xl space-y-4 text-white/80">
             <p>
-              In our previous meetings we agreed to keep Phase 1 lean — trim the scope, mind the budget.
-              Then we drifted a little past the deadline. So instead of handing over the stripped-back
-              version, I went ahead and built <span className="font-semibold text-white">the whole
-              thing</span>: all twelve modules above, fully working, tested end-to-end and
-              security-hardened.
+              In our previous meetings we agreed to keep Phase 1 lean — trim the scope, mind the
+              budget. Then we drifted a little past the deadline. So instead of handing over the
+              stripped-back version, we went ahead and built{' '}
+              <span className="font-semibold text-white">the whole thing</span>: all twelve modules
+              above, fully working, tested end-to-end and security-hardened.
             </p>
-            <p className="font-display text-lg italic text-whisky-200">
-              You ordered a dram; I poured the whole bottle.
+            <p className="font-display text-lg italic text-primary-200">
+              You ordered a dram; we poured the whole bottle.
             </p>
             <p className="text-sm text-white/60">
-              P.S. — if a little bonus happens to find its way into the budget, I&apos;d gladly raise a
+              P.S. — if a little bonus happens to find its way into the budget, we&apos;d gladly raise a
               glass to it. Purely for morale, of course. 😄
             </p>
           </div>
         </section>
 
-        <p className="mt-10 text-center text-xs text-charcoal-400">
-          Destination Whisky — Phase 1 build report
-        </p>
+        <p className="mt-10 text-center text-xs text-gray-400">Destination Whisky — Phase 1 build report</p>
       </main>
     </div>
   )
