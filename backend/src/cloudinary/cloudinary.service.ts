@@ -1,6 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
+
+/**
+ * The one gate every uploaded file passes through.
+ *
+ * Whatever interceptor a controller uses, the bytes end up here, so this is
+ * where "it must be a real image, and not too big" is enforced — defence in
+ * depth that doesn't depend on each call site remembering to add a filter.
+ */
+const ALLOWED_IMAGE_MIME = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/avif',
+]);
+// SVG is deliberately excluded: it's an XSS vector (it can carry <script>) and
+// nothing here needs it. Raw/video are excluded by resource_type: 'image'.
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
 
 @Injectable()
 export class CloudinaryService {
@@ -12,11 +30,28 @@ export class CloudinaryService {
     });
   }
 
+  private assertIsImage(file: Express.Multer.File): void {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('No file was uploaded.');
+    }
+    if (!ALLOWED_IMAGE_MIME.has(file.mimetype)) {
+      throw new BadRequestException(
+        'Only JPEG, PNG, WebP, GIF or AVIF images are allowed.',
+      );
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      throw new BadRequestException('Images must be 10 MB or smaller.');
+    }
+  }
+
   async uploadImage(file: Express.Multer.File): Promise<UploadApiResponse> {
+    this.assertIsImage(file);
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          resource_type: 'auto',
+          // 'image' (not 'auto'): reject anything Cloudinary wouldn't treat as a
+          // real image, so a renamed executable or a video can't slip through.
+          resource_type: 'image',
           folder: 'byfoods-cms',
           transformation: [
             { quality: 'auto' },

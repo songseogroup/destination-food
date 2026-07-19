@@ -6,6 +6,7 @@ import { Star, MessageCircle, Trash2, Loader2 } from 'lucide-react'
 import { api } from '../lib/api'
 import { useCustomerAuth } from '../contexts/CustomerAuthContext'
 import StarRating from './ui/StarRating'
+import ReportReviewButton from './ReportReviewButton'
 
 type EntityType = 'bar' | 'distillery' | 'event'
 
@@ -248,6 +249,11 @@ export default function ReviewsSection({ entityType, entityId }: ReviewsSectionP
                     <p className="mt-1 text-xs text-charcoal-500">{formatDate(r.ownerReplyAt)}</p>
                   )}
                 </div>
+              )}
+              {/* Not on your own review — deleting it is the option there, and
+                  reporting yourself is only ever a mis-click. */}
+              {isAuthenticated && customer?.id !== r.customerId && (
+                <ReportReviewButton reviewId={r.id} />
               )}
             </li>
           ))}

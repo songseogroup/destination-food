@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useMemo } from 'react'
 import { useQuery } from 'react-query'
-import { BarChart3, Calendar, Image, List, MapPin, Star, Edit } from 'lucide-react'
+import { BarChart3, Calendar, Image, List, MapPin, Plus, Star, Edit } from 'lucide-react'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
+import { isOwnerRole } from '@/lib/roles'
 import { Bar, Distillery, Event } from '@/lib/types'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 
@@ -45,10 +46,32 @@ const modeCopy = {
   },
 }
 
+/** Singular, for talking to an operator about their own listing. */
+const ownerNoun: Record<EntityType, string> = {
+  bars: 'bar',
+  distilleries: 'distillery',
+  events: 'event',
+}
+
 const entityConfig: Record<EntityType, { label: string; icon: any; path: string }> = {
   bars: { label: 'Bars', icon: BarChart3, path: '/bars?limit=100' },
   distilleries: { label: 'Distilleries', icon: MapPin, path: '/distilleries?limit=100' },
   events: { label: 'Events', icon: Calendar, path: '/events?limit=100' },
+}
+
+/**
+ * Operators read their own listings through /mine, not the public list.
+ *
+ * The public endpoints hide anything inactive and anything owned by a vendor
+ * still awaiting approval — and a self-registered operator starts out pending.
+ * Reading the public list here meant an operator's freshly created listing was
+ * invisible to them, so the page kept insisting they had none and they'd create
+ * it over and over.
+ */
+const minePath: Record<EntityType, string> = {
+  bars: '/bars/mine',
+  distilleries: '/distilleries/mine',
+  events: '/events/mine',
 }
 
 export function EntityWorkspaceIndex({ mode }: EntityWorkspaceIndexProps) {
@@ -56,6 +79,8 @@ export function EntityWorkspaceIndex({ mode }: EntityWorkspaceIndexProps) {
   const router = useRouter()
   const copy = modeCopy[mode]
   const ModeIcon = copy.icon
+  const isOperator = isOwnerRole(user?.role)
+  const pathFor = (type: EntityType) => (isOperator ? minePath[type] : entityConfig[type].path)
 
   const visibleTypes = useMemo<EntityType[]>(() => {
     switch (user?.role) {
@@ -71,17 +96,19 @@ export function EntityWorkspaceIndex({ mode }: EntityWorkspaceIndexProps) {
     }
   }, [mode, user?.role])
 
-  const barsQuery = useQuery('workspace-bars', () => api.get(entityConfig.bars.path).then((res) => res.data), {
+  const barsQuery = useQuery(['workspace-bars', isOperator], () => api.get(pathFor('bars')).then((res) => res.data), {
     enabled: visibleTypes.includes('bars'),
   })
   const distilleriesQuery = useQuery(
-    'workspace-distilleries',
-    () => api.get(entityConfig.distilleries.path).then((res) => res.data),
+    ['workspace-distilleries', isOperator],
+    () => api.get(pathFor('distilleries')).then((res) => res.data),
     { enabled: visibleTypes.includes('distilleries') },
   )
-  const eventsQuery = useQuery('workspace-events', () => api.get(entityConfig.events.path).then((res) => res.data), {
-    enabled: visibleTypes.includes('events'),
-  })
+  const eventsQuery = useQuery(
+    ['workspace-events', isOperator],
+    () => api.get(pathFor('events')).then((res) => res.data),
+    { enabled: visibleTypes.includes('events') },
+  )
 
   const isLoading = barsQuery.isLoading || distilleriesQuery.isLoading || eventsQuery.isLoading
 
@@ -124,10 +151,33 @@ export function EntityWorkspaceIndex({ mode }: EntityWorkspaceIndexProps) {
 
   if (ownerType) {
     if (ownerEntities.length === 0) {
+      /**
+       * An operator with no listing yet.
+       *
+       * This used to say "Create your listing before managing …" and stop there,
+       * with nothing to click — so a newly registered operator had no way to
+       * list themselves at all. The API was always willing (POST /bars accepts
+       * the BAR role and stamps the new row with their userId); only this screen
+       * was missing the door.
+       */
+      const noun = ownerNoun[ownerType]
       return (
-        <div className="rounded-lg border border-gray-200 bg-white px-6 py-12 text-center shadow-sm">
-          <h1 className="text-xl font-semibold text-gray-950">No listing found</h1>
-          <p className="mt-2 text-sm text-gray-600">Create your listing before managing {mode}.</p>
+        <div className="card px-6 py-14 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-600">
+            <ModeIcon className="h-6 w-6" />
+          </div>
+          <h1 className="mt-4 text-xl font-semibold text-gray-950">
+            Let&apos;s get your {noun} listed
+          </h1>
+          <p className="mx-auto mt-2 max-w-sm text-sm text-gray-600">
+            {mode === 'details'
+              ? `Add your details, photos and pricing. Nothing goes live until you publish it.`
+              : `Create your ${noun} first — then you can manage its ${mode} here.`}
+          </p>
+          <Link href={`/dashboard/${ownerType}/new`} className="btn-primary mt-6 inline-flex">
+            <Plus className="h-4 w-4" />
+            Create your {noun}
+          </Link>
         </div>
       )
     }

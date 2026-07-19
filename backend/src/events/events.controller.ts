@@ -15,6 +15,7 @@ import {
   BadRequestException
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { imageUploadOptions } from '../common/upload.options';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 
 import { EventsService } from './events.service';
@@ -85,6 +86,25 @@ export class EventsController {
     return this.eventsService.findByCategory(category);
   }
 
+
+  /**
+   * The caller's own events, in whatever state they're in.
+   *
+   * Must stay ABOVE @Get(':id') — Nest matches in declaration order, and a
+   * static segment declared after a param route is simply never reached.
+   *
+   * Unlike the public @Get(), this doesn't hide inactive listings or listings
+   * whose owner is still pending approval — an operator has to be able to see
+   * their own listing the moment they create it, or they'll create it again.
+   */
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "The caller's own events, including unpublished and pending-approval ones" })
+  async findMine(@Request() req) {
+    return this.eventsService.findMine(req.user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get event by ID (Public)' })
   @ApiResponse({ status: 200, description: 'Event retrieved successfully' })
@@ -140,7 +160,7 @@ export class EventsController {
   @Post(':id/media')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.EVENT_HOST, UserRole.TOUR_OPERATOR)
-  @UseInterceptors(FilesInterceptor('files'))
+  @UseInterceptors(FilesInterceptor('files', 10, imageUploadOptions))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Upload media for an event' })
   @ApiConsumes('multipart/form-data')

@@ -209,7 +209,7 @@ export default function BannerSlot({
       </div>
     )
     const wrapped = linkUrl ? (
-      <Link href={linkUrl} target="_blank">
+      <Link href={linkUrl} target="_blank" rel="noopener noreferrer">
         {inner}
       </Link>
     ) : (
@@ -248,7 +248,7 @@ export default function BannerSlot({
             </div>
           )
           return b.linkUrl ? (
-            <Link key={b.id} href={b.linkUrl} target="_blank" onClick={() => handleClick(b.id)}>
+            <Link key={b.id} href={b.linkUrl} target="_blank" rel="noopener noreferrer" onClick={() => handleClick(b.id)}>
               {inner}
             </Link>
           ) : (
@@ -279,7 +279,7 @@ export default function BannerSlot({
               </div>
             )
             return b.linkUrl ? (
-              <Link key={b.id} href={b.linkUrl} target="_blank" onClick={() => handleClick(b.id)}>
+              <Link key={b.id} href={b.linkUrl} target="_blank" rel="noopener noreferrer" onClick={() => handleClick(b.id)}>
                 {inner}
               </Link>
             ) : (

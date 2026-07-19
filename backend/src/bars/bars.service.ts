@@ -7,6 +7,7 @@ import { CreateBarDto } from './dto/create-bar.dto';
 import { UpdateBarDto } from './dto/update-bar.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { UserRole } from '../users/entities/user.entity';
+import { applyListingVisibility, isStaffRole } from '../common/listing-visibility';
 
 @Injectable()
 export class BarsService {
@@ -22,6 +23,24 @@ export class BarsService {
       bar.userId = userId;
     }
     return this.barRepository.save(bar);
+  }
+
+
+  /**
+   * The caller's own listings, whatever state they're in.
+   *
+   * findAll() is the public view: it hides anything inactive and anything owned
+   * by a vendor who is still pending approval. An operator's own dashboard can't
+   * use that — a self-registered operator starts as `pending`, so their own
+   * listing would be invisible to them and they would create it again, and
+   * again. This is deliberately unfiltered, and scoped to the caller by userId.
+   */
+  async findMine(userId: number): Promise<{ data: Bar[]; total: number }> {
+    const [data, total] = await this.barRepository.findAndCount({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
+    return { data, total };
   }
 
   async findAll(paginationDto: PaginationDto, userId?: number, userRole?: UserRole): Promise<{ data: Bar[]; total: number }> {
@@ -62,19 +81,11 @@ export class BarsService {
   }
 
   async findOne(id: number, userId?: number, userRole?: UserRole): Promise<Bar> {
-    const qb = this.barRepository
-      .createQueryBuilder('bar')
-      .where('bar.id = :id', { id })
-      .andWhere('bar.isActive = :a', { a: true });
+    const qb = this.barRepository.createQueryBuilder('bar').where('bar.id = :id', { id });
 
-    if (userRole !== UserRole.ADMIN && userId) {
-      qb.andWhere('bar.userId = :uid', { uid: userId });
-    } else if (!userRole) {
-      qb.leftJoin('users', 'u', 'u.id = bar.userId').andWhere(
-        '(bar.userId IS NULL OR (u.approvalStatus = :approved AND u.isActive = :uActive))',
-        { approved: 'approved', uActive: true },
-      );
-    }
+    // Staff see everything; the owning vendor sees their own (drafts and all,
+    // even while pending approval); everyone else gets the published view.
+    applyListingVisibility(qb, 'bar', userId, userRole);
 
     const bar = await qb.getOne();
     if (!bar) {
@@ -96,9 +107,12 @@ export class BarsService {
 
   async update(id: number, updateBarDto: UpdateBarDto, userId?: number, userRole?: UserRole): Promise<Bar> {
     const bar = await this.findOne(id, userId, userRole);
-    
-    // Check ownership for non-admin users
-    if (userRole !== UserRole.ADMIN && bar.userId !== userId) {
+
+    // Staff may edit any listing; a vendor only their own. Testing against
+    // UserRole.ADMIN alone left super_admin on the vendor side of this check,
+    // so the platform's highest role was refused on every listing it didn't
+    // personally own.
+    if (!isStaffRole(userRole) && bar.userId !== userId) {
       throw new ForbiddenException('You can only update your own bars');
     }
     
@@ -108,9 +122,8 @@ export class BarsService {
 
   async remove(id: number, userId?: number, userRole?: UserRole): Promise<void> {
     const bar = await this.findOne(id, userId, userRole);
-    
-    // Check ownership for non-admin users
-    if (userRole !== UserRole.ADMIN && bar.userId !== userId) {
+
+    if (!isStaffRole(userRole) && bar.userId !== userId) {
       throw new ForbiddenException('You can only delete your own bars');
     }
     

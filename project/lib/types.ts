@@ -19,6 +19,10 @@ export interface Bar {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  /** Hours before the booking that a guest can still self-refund. Default 48. */
+  refundWindowHours?: number
+  /** The owner. Null means the listing is unclaimed. */
+  userId?: number | null
 }
 
 export interface Distillery {
@@ -43,6 +47,10 @@ export interface Distillery {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  /** Hours before the booking that a guest can still self-refund. Default 48. */
+  refundWindowHours?: number
+  /** The owner. Null means the listing is unclaimed. */
+  userId?: number | null
 }
 
 export interface Event {
@@ -67,6 +75,10 @@ export interface Event {
   isFeatured: boolean
   createdAt: string
   updatedAt: string
+  /** Hours before the booking that a guest can still self-refund. Default 48. */
+  refundWindowHours?: number
+  /** The owner. Null means the listing is unclaimed. */
+  userId?: number | null
 }
 
 export interface Blog {

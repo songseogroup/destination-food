@@ -15,6 +15,7 @@ import {
   BadRequestException
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { imageUploadOptions } from '../common/upload.options';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 
 import { DistilleriesService } from './distilleries.service';
@@ -69,6 +70,25 @@ export class DistilleriesController {
   @ApiQuery({ name: 'q', required: true, type: String })
   async search(@Query('q') query: string) {
     return this.distilleriesService.search(query);
+  }
+
+
+  /**
+   * The caller's own distilleries, in whatever state they're in.
+   *
+   * Must stay ABOVE @Get(':id') — Nest matches in declaration order, and a
+   * static segment declared after a param route is simply never reached.
+   *
+   * Unlike the public @Get(), this doesn't hide inactive listings or listings
+   * whose owner is still pending approval — an operator has to be able to see
+   * their own listing the moment they create it, or they'll create it again.
+   */
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "The caller's own distilleries, including unpublished and pending-approval ones" })
+  async findMine(@Request() req) {
+    return this.distilleriesService.findMine(req.user.id);
   }
 
   @Get(':id')
@@ -126,7 +146,7 @@ export class DistilleriesController {
   @Post(':id/media')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DISTILLERY)
-  @UseInterceptors(FilesInterceptor('files'))
+  @UseInterceptors(FilesInterceptor('files', 10, imageUploadOptions))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Upload media for a distillery' })
   @ApiConsumes('multipart/form-data')

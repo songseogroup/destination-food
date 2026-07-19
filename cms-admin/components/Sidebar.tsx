@@ -25,6 +25,7 @@ import {
   Users,
   Image as ImageIcon,
   Store,
+  Rocket,
 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { roleLabels } from '@/lib/roles'
@@ -40,11 +41,13 @@ const isActiveRoute = (pathname: string, href: string) => {
 
 const superAdminNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Phase 1 Report', href: '/dashboard/admin/phase-1', icon: Rocket },
   { name: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp },
   { name: 'Homepage', href: '/dashboard/homepage', icon: Home },
   { name: 'Banners', href: '/dashboard/admin/banners', icon: ImageIcon },
   { name: 'Team & Admins', href: '/dashboard/admin/users', icon: ShieldCheck },
   { name: 'Vendors', href: '/dashboard/admin/vendors', icon: Store },
+  { name: 'Listing Claims', href: '/dashboard/admin/claims', icon: Store },
   { name: 'Bars', href: '/dashboard/bars', icon: BarChart3 },
   { name: 'Distilleries', href: '/dashboard/distilleries', icon: MapPin },
   { name: 'Events', href: '/dashboard/events', icon: Calendar },

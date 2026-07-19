@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ServeStaticModule } from '@nestjs/serve-static';
@@ -26,6 +28,10 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { DestinationsModule } from './destinations/destinations.module';
+import { BadgesModule } from './badges/badges.module';
+import { ClaimsModule } from './claims/claims.module';
+import { SessionsModule } from './sessions/sessions.module';
 
 // Entities
 import { User } from './users/entities/user.entity';
@@ -45,6 +51,11 @@ import { PlatformConfig } from './platform-config/entities/platform-config.entit
 import { Customer } from './customers/entities/customer.entity';
 import { Banner } from './banners/entities/banner.entity';
 import { Review } from './reviews/entities/review.entity';
+import { VerifiedVisit } from './reviews/entities/verified-visit.entity';
+import { ReviewReport } from './reviews/entities/review-report.entity';
+import { Badge } from './badges/entities/badge.entity';
+import { Claim } from './claims/entities/claim.entity';
+import { Session } from './sessions/entities/session.entity';
 import { Feedback } from './feedback/entities/feedback.entity';
 import { AnalyticsEvent } from './analytics/entities/analytics-event.entity';
 
@@ -106,6 +117,17 @@ if (
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    // Rate limiting. One global throttler, generous enough for ordinary browsing
+    // (a listing page fires several requests). Sensitive endpoints — login,
+    // review/claim/report submission — narrow this same limiter down with their
+    // own @Throttle override to a handful per minute, so brute force and spam are
+    // throttled without touching normal traffic. Keyed by IP, which is real
+    // because main.ts trusts one proxy hop.
+    //
+    // A single named throttler on purpose: extra named throttlers in forRoot
+    // apply to EVERY route at once, so a "strict" band here would silently cap
+    // all browsing at its low limit.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60000, limit: 300 }]),
     ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
@@ -133,6 +155,14 @@ if (
         Customer,
         Banner,
         Review,
+        // This list is hand-maintained — an entity missing from it registers
+        // nowhere, and the first query against it dies at runtime with
+        // "No metadata for X was found" rather than at build time.
+        VerifiedVisit,
+        ReviewReport,
+        Badge,
+        Claim,
+        Session,
         Feedback,
         AnalyticsEvent,
       ],
@@ -181,6 +211,15 @@ if (
     ReviewsModule,
     FeedbackModule,
     AnalyticsModule,
+    DestinationsModule,
+    BadgesModule,
+    ClaimsModule,
+    SessionsModule,
+  ],
+  providers: [
+    // Apply the rate limiter to every route by default. Endpoints that must not
+    // be throttled (the Stripe webhook, which retries) opt out with @SkipThrottle.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

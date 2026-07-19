@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -6,7 +6,7 @@ import { Order, OrderStatus, OrderType } from './entities/order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
-import { UserRole } from '../users/entities/user.entity';
+import { User, UserRole } from '../users/entities/user.entity';
 import { Bar } from '../bars/entities/bar.entity';
 import { Distillery } from '../distilleries/entities/distillery.entity';
 import { Event } from '../events/entities/event.entity';
@@ -18,6 +18,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { StripeService } from '../stripe/stripe.service';
 import { StripeAccountStatus } from '../stripe/entities/stripe-account.entity';
 import { NotificationType } from '../stripe/entities/notification.entity';
+import { SessionsService } from '../sessions/sessions.service';
+import { ReviewEntityType } from '../reviews/entities/review.entity';
 
 @Injectable()
 export class OrdersService {
@@ -32,6 +34,8 @@ export class OrdersService {
     private eventRepository: Repository<Event>,
     @InjectRepository(Customer)
     private customerRepository: Repository<Customer>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
     @InjectRepository(Refund)
     private refundRepository: Repository<Refund>,
     @InjectRepository(TransactionLedger)
@@ -39,23 +43,46 @@ export class OrdersService {
     private emailService: EmailService,
     private notificationsService: NotificationsService,
     private stripeService: StripeService,
+    private sessionsService: SessionsService,
   ) {}
 
-  /** Returns the listing the order is attached to plus its owner. */
+  private readonly logger = new Logger(OrdersService.name);
+
+  /** Returns the listing the order is attached to, plus its owner and refund window. */
   private async getOrderListing(order: Order) {
     if (order.orderType === OrderType.BAR_RESERVATION && order.barId) {
       const bar = await this.barRepository.findOne({ where: { id: order.barId } });
-      return { listing: bar, name: bar?.name || 'Bar', ownerUserId: bar?.userId };
+      return {
+        listing: bar,
+        name: bar?.name || 'Bar',
+        ownerUserId: bar?.userId,
+        refundWindowHours: bar?.refundWindowHours,
+      };
     }
     if (order.orderType === OrderType.DISTILLERY_TOUR && order.distilleryId) {
       const d = await this.distilleryRepository.findOne({ where: { id: order.distilleryId } });
-      return { listing: d, name: d?.name || 'Distillery', ownerUserId: d?.userId };
+      return {
+        listing: d,
+        name: d?.name || 'Distillery',
+        ownerUserId: d?.userId,
+        refundWindowHours: d?.refundWindowHours,
+      };
     }
     if (order.orderType === OrderType.EVENT_BOOKING && order.eventId) {
       const e = await this.eventRepository.findOne({ where: { id: order.eventId } });
-      return { listing: e, name: e?.name || 'Event', ownerUserId: e?.userId };
+      return {
+        listing: e,
+        name: e?.name || 'Event',
+        ownerUserId: e?.userId,
+        refundWindowHours: e?.refundWindowHours,
+      };
     }
-    return { listing: null, name: 'your booking', ownerUserId: undefined };
+    return {
+      listing: null,
+      name: 'your booking',
+      ownerUserId: undefined,
+      refundWindowHours: undefined,
+    };
   }
 
   /**
@@ -88,6 +115,17 @@ export class OrdersService {
         `${listingName} isn't accepting online bookings yet — the host is still finishing their payment setup. Nothing has been charged. Please try again later.`,
       );
     }
+  }
+
+  /** The listing (type + id) a booking's session must belong to. */
+  private sessionEntityFor(dto: CreateOrderDto): { entityType: ReviewEntityType; entityId: number } {
+    if (dto.orderType === 'distillery_tour') {
+      return { entityType: ReviewEntityType.DISTILLERY, entityId: dto.distilleryId };
+    }
+    if (dto.orderType === 'event_booking') {
+      return { entityType: ReviewEntityType.EVENT, entityId: dto.eventId };
+    }
+    return { entityType: ReviewEntityType.BAR, entityId: dto.barId };
   }
 
   async create(createOrderDto: CreateOrderDto, customerId: number): Promise<Order> {
@@ -137,9 +175,35 @@ export class OrdersService {
       customerEmail: customer.email,
       customerPhone: customer.phone || createOrderDto.customerPhone,
       bookingDate: createOrderDto.bookingDate ? new Date(createOrderDto.bookingDate) : null,
+      // Never trust a client-supplied paid flag. A booking starts unpaid; it only
+      // becomes paid when the Stripe webhook confirms real money moved (or an
+      // owner marks an on-site payment). Otherwise a customer could POST
+      // isPaid:true and hold a confirmed, "paid" booking without paying a cent.
+      isPaid: false,
+      autoPayoutProcessed: false,
     });
 
-    const savedOrder = await this.orderRepository.save(order);
+    // When the booking is against a session, the seats and the order must commit
+    // together: take capacity and save the order in one transaction, so a booking
+    // can never exist without its seats, nor seats be held for an order that
+    // failed to save. Without a session it's the old free-text path, unchanged.
+    let savedOrder: Order;
+    if (createOrderDto.sessionId) {
+      // The session must belong to the exact listing this order is for. Pass the
+      // order's own entity so reserve() can reject a session from any other one.
+      const expected = this.sessionEntityFor(createOrderDto);
+      savedOrder = await this.orderRepository.manager.transaction(async (manager) => {
+        await this.sessionsService.reserve(
+          createOrderDto.sessionId,
+          createOrderDto.numberOfGuests || 1,
+          manager,
+          expected,
+        );
+        return manager.getRepository(Order).save(order);
+      });
+    } else {
+      savedOrder = await this.orderRepository.save(order);
+    }
 
     // Update customer stats
     customer.totalOrders += 1;
@@ -151,7 +215,11 @@ export class OrdersService {
     // The Stripe webhook fires sendBookingConfirmation separately once the
     // owner confirms via /orders/:id/status, so this is just the first
     // touch confirming we got the request.
-    const { name: listingName, ownerUserId } = await this.getOrderListing(savedOrder);
+    const {
+      name: listingName,
+      ownerUserId,
+      refundWindowHours,
+    } = await this.getOrderListing(savedOrder);
     this.emailService
       .sendBookingReceivedToCustomer(
         customer.email,
@@ -159,6 +227,7 @@ export class OrdersService {
         savedOrder.id,
         listingName,
         savedOrder.totalAmount as any,
+        refundWindowHours,
       )
       .catch(() => undefined);
     this.notificationsService
@@ -290,7 +359,7 @@ export class OrdersService {
 
     // Status changed → notify customer (in-app) and email the ticket on confirmation.
     if (previousStatus !== saved.status) {
-      const { name: listingName } = await this.getOrderListing(saved);
+      const { name: listingName, ownerUserId } = await this.getOrderListing(saved);
       if (saved.status === OrderStatus.CONFIRMED) {
         this.emailService
           .sendBookingTicket(
@@ -314,6 +383,17 @@ export class OrdersService {
           })
           .catch(() => undefined);
       } else if (saved.status === OrderStatus.CANCELLED) {
+        // Give the seats back to the session so someone else can book them.
+        // Best-effort — a failure here must not block the cancellation or the
+        // refund, so it's logged, not thrown.
+        if (saved.sessionId) {
+          await this.sessionsService
+            .release(saved.sessionId, saved.numberOfGuests || 1)
+            .catch((err) =>
+              this.logger.error(`Failed to release seats for cancelled order ${saved.id}: ${err.message}`),
+            );
+        }
+
         // If the order was paid, automatically queue a full refund for
         // SuperAdmin approval. The owner doesn't have to remember to do it
         // and the customer can't be left out of pocket.
@@ -347,6 +427,41 @@ export class OrdersService {
             metadata: { orderId: saved.id, refundInitiated },
           })
           .catch(() => undefined);
+
+        // Both sides get told by email too. A cancellation is not something to
+        // find out by happening to log in, and the client's minimum email set
+        // lists it for customer and operator alike.
+        const refundState: 'full' | 'none' | 'failed' = !saved.isPaid
+          ? 'none'
+          : refundInitiated
+            ? 'full'
+            : 'failed';
+        this.emailService
+          .sendBookingCancelledToCustomer(
+            saved.customerEmail,
+            saved.customerName || 'there',
+            saved.id,
+            listingName,
+            saved.totalAmount as any,
+            refundState,
+          )
+          .catch(() => undefined);
+        if (ownerUserId) {
+          this.userRepository
+            .findOne({ where: { id: ownerUserId } })
+            .then((owner) => {
+              if (!owner?.email) return;
+              return this.emailService.sendBookingCancelledToOwner(
+                owner.email,
+                owner.firstName || 'there',
+                saved.id,
+                listingName,
+                saved.customerName || 'A customer',
+                saved.totalAmount as any,
+              );
+            })
+            .catch(() => undefined);
+        }
       }
     }
 

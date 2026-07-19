@@ -22,6 +22,20 @@ export class Distillery {
   @Column()
   location: string;
 
+  /**
+   * City and country, for the destination landing pages.
+   *
+   * `location` is free text and only happens to hold a bare city name today —
+   * the moment someone types "Sydney CBD" it stops matching. These are the
+   * fields the destination pages group on. Events already had them; bars and
+   * distilleries did not, which is why country pages were impossible.
+   */
+  @Column({ nullable: true })
+  city: string;
+
+  @Column({ nullable: true })
+  country: string;
+
   @Column()
   image: string;
 

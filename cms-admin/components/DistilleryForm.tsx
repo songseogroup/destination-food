@@ -16,6 +16,7 @@ interface DistilleryFormProps {
 }
 
 interface DistilleryFormData {
+  refundWindowHours: number | null
   name: string
   type: string
   location: string
@@ -51,6 +52,7 @@ export function DistilleryForm({ distillery, onSuccess, onCancel }: DistilleryFo
 
   const { register, handleSubmit, formState: { errors }, setValue, watch, control } = useForm<DistilleryFormData>({
     defaultValues: {
+      refundWindowHours: distillery?.refundWindowHours ?? 48,
       name: distillery?.name || '',
       type: distillery?.type || '',
       location: distillery?.location || '',
@@ -218,6 +220,24 @@ export function DistilleryForm({ distillery, onSuccess, onCancel }: DistilleryFo
               <option value="$$$$">$$$$ - Very Expensive</option>
             </select>
             {errors.priceRange && <p className="text-red-500 text-sm mt-1">{errors.priceRange.message}</p>}
+          </div>
+
+          <div>
+            <label className="label">Refund window (hours before booking)</label>
+            <input
+              {...register('refundWindowHours', {
+                setValueAs: (v) => (v === '' || v === null ? null : Number(v)),
+              })}
+              type="number"
+              step="1"
+              min="0"
+              className="input-field"
+              placeholder="48"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Guests can cancel for a full refund up until this many hours before their tour, and this
+              is shown to them at checkout. Your own cancellations always refund automatically.
+            </p>
           </div>
         </div>
 

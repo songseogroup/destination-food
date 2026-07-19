@@ -1,5 +1,6 @@
 'use client'
 
+import DOMPurify from 'isomorphic-dompurify'
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -163,10 +164,14 @@ export default function BlogDetailPage() {
                     />
                   </div>
 
-                  {/* Article Content */}
+                  {/* Article Content.
+                      Sanitised before it's dumped into the DOM — blogs are
+                      admin-authored now, but stripping script, event handlers and
+                      javascript: URLs here means a compromised admin (or a bad
+                      paste) can't turn an article into stored XSS on every reader. */}
                   <div
                     className="prose prose-lg prose-whisky max-w-none"
-                    dangerouslySetInnerHTML={{ __html: blogPost.content }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(blogPost.content || '') }}
                   />
 
                   {/* Tags */}

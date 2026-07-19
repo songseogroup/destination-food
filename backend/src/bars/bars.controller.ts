@@ -15,6 +15,7 @@ import {
   BadRequestException
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { imageUploadOptions } from '../common/upload.options';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 
 import { BarsService } from './bars.service';
@@ -23,6 +24,7 @@ import { CreateBarDto } from './dto/create-bar.dto';
 import { UpdateBarDto } from './dto/update-bar.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
@@ -71,13 +73,35 @@ export class BarsController {
     return this.barsService.search(query);
   }
 
+  /**
+   * The caller's own bars, in whatever state they're in.
+   *
+   * Must stay ABOVE @Get(':id') — Nest matches in declaration order. The old
+   * @Get('my-bar') was declared below it, so every call was parsed as an id and
+   * died in ParseIntPipe ("numeric string is expected"); it had never once been
+   * reachable.
+   *
+   * Unlike the public @Get(), this doesn't hide inactive listings or listings
+   * whose owner is still pending approval — an operator has to be able to see
+   * their own listing the moment they create it, or they'll create it again.
+   */
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "The caller's own bars, including unpublished and pending-approval ones" })
+  async findMine(@Request() req) {
+    return this.barsService.findMine(req.user.id);
+  }
+
   @Get(':id')
-  @ApiOperation({ summary: 'Get bar by ID (Public)' })
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Get bar by ID (public; owners also see their own drafts)' })
   @ApiResponse({ status: 200, description: 'Bar retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Bar not found' })
   async findOne(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    // For public access, don't pass user info
-    return this.barsService.findOne(id, undefined, undefined);
+    // Anonymous callers get the published view; an owner asking for their own
+    // listing gets it even while unpublished or pending approval.
+    return this.barsService.findOne(id, req.user?.id, req.user?.role);
   }
 
   @Patch(':id')
@@ -103,16 +127,6 @@ export class BarsController {
     return { message: 'Bar deleted successfully' };
   }
 
-  @Get('my-bar')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.BAR)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current bar owner\'s bar' })
-  @ApiResponse({ status: 200, description: 'Bar retrieved successfully' })
-  @ApiResponse({ status: 404, description: 'No bar found for this user' })
-  async getMyBar(@Request() req) {
-    return this.barsService.findByUserId(req.user.id);
-  }
 
   @Get(':id/media')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -137,7 +151,7 @@ export class BarsController {
   @Post(':id/media')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BAR)
-  @UseInterceptors(FilesInterceptor('files'))
+  @UseInterceptors(FilesInterceptor('files', 10, imageUploadOptions))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Upload media for a bar' })
   @ApiConsumes('multipart/form-data')

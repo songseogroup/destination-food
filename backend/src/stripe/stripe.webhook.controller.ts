@@ -1,9 +1,14 @@
 import { Controller, Post, Req, Res, Headers, Logger, HttpCode, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { SkipThrottle } from '@nestjs/throttler';
 import Stripe from 'stripe';
 import { StripeService } from './stripe.service';
 
+// Stripe retries failed webhook deliveries, sometimes in bursts. Rate limiting
+// them would drop legitimate payment events — the signature check below is what
+// keeps this endpoint safe, not a request cap.
+@SkipThrottle()
 @Controller('stripe/webhook')
 export class StripeWebhookController {
   private readonly logger = new Logger(StripeWebhookController.name);

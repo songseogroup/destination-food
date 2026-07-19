@@ -80,9 +80,17 @@ export class EmailService {
     orderId: number,
     listingName: string,
     amount: number,
+    /** The listing's refund window. Shown so the terms travel with the booking. */
+    refundWindowHours?: number,
   ): Promise<boolean> {
     const subject = `We got your booking — ${listingName}`;
-    const html = this.getBookingReceivedCustomerTemplate(customerName, orderId, listingName, amount);
+    const html = this.getBookingReceivedCustomerTemplate(
+      customerName,
+      orderId,
+      listingName,
+      amount,
+      refundWindowHours,
+    );
     return this.sendEmail(customerEmail, subject, html);
   }
 
@@ -136,6 +144,74 @@ export class EmailService {
     );
 
     return this.sendEmail(customerEmail, subject, html);
+  }
+
+  /**
+   * "Your booking is cancelled" — to the customer.
+   *
+   * The in-app notification already fired, but the client's minimum email set
+   * lists cancellation for both sides, and a cancellation is exactly the kind of
+   * thing nobody wants to discover only by logging in.
+   */
+  async sendBookingCancelledToCustomer(
+    customerEmail: string,
+    customerName: string,
+    orderId: number,
+    listingName: string,
+    amount: number,
+    refund: 'full' | 'none' | 'failed',
+  ): Promise<boolean> {
+    return this.sendEmail(
+      customerEmail,
+      `Booking cancelled — ${listingName}`,
+      this.getBookingCancelledCustomerTemplate(customerName, orderId, listingName, amount, refund),
+    );
+  }
+
+  /** The operator's copy of the same cancellation. */
+  async sendBookingCancelledToOwner(
+    ownerEmail: string,
+    ownerName: string,
+    orderId: number,
+    listingName: string,
+    customerName: string,
+    amount: number,
+  ): Promise<boolean> {
+    return this.sendEmail(
+      ownerEmail,
+      `Booking cancelled — ${listingName}`,
+      this.getBookingCancelledOwnerTemplate(ownerName, orderId, listingName, customerName, amount),
+    );
+  }
+
+  /** "How was it?" — sent after the experience has happened. */
+  async sendReviewRequest(
+    customerEmail: string,
+    customerName: string,
+    listingName: string,
+    reviewUrl: string,
+  ): Promise<boolean> {
+    return this.sendEmail(
+      customerEmail,
+      `How was ${listingName}?`,
+      this.getReviewRequestTemplate(customerName, listingName, reviewUrl),
+    );
+  }
+
+  /** "Someone reviewed you" — to the operator, with a link to reply. */
+  async sendReviewPublished(
+    ownerEmail: string,
+    ownerName: string,
+    listingName: string,
+    rating: number,
+    comment: string,
+    reviewerName: string,
+  ): Promise<boolean> {
+    return this.sendEmail(
+      ownerEmail,
+      `New ${rating}-star review — ${listingName}`,
+      this.getReviewPublishedTemplate(ownerName, listingName, rating, comment, reviewerName),
+    );
   }
 
   /**
@@ -437,7 +513,25 @@ export class EmailService {
     orderId: number,
     listingName: string,
     amount: number,
+    refundWindowHours?: number,
   ): string {
+    const rows: Array<[string, string]> = [
+      ['Booking reference', this.ref(orderId)],
+      ['Amount', this.money(amount)],
+      ['Status', 'Awaiting confirmation'],
+    ];
+    // The client's rules require the cancellation terms at checkout *and* in the
+    // confirmation. Omitted rather than guessed when we weren't told the window —
+    // a wrong number here is a promise we'd have to break.
+    if (typeof refundWindowHours === 'number') {
+      rows.push([
+        'Cancellation',
+        refundWindowHours > 0
+          ? `Free up to ${refundWindowHours}h before`
+          : 'Non-refundable',
+      ]);
+    }
+
     return this.shell({
       title: 'Booking received',
       preheader: `We've got your request for ${listingName} — awaiting confirmation.`,
@@ -448,11 +542,16 @@ export class EmailService {
           Your request for <strong style="color:${EmailService.C.ink};">${listingName}</strong> is with the venue now.
           As soon as they confirm, we'll email your ticket.
         </p>
-        ${this.detailPanel([
-          ['Booking reference', this.ref(orderId)],
-          ['Amount', this.money(amount)],
-          ['Status', 'Awaiting confirmation'],
-        ])}
+        ${this.detailPanel(rows)}
+        ${
+          typeof refundWindowHours === 'number' && refundWindowHours > 0
+            ? `<p style="margin:0 0 14px;">
+                 Plans change — you can cancel free of charge up until
+                 <strong style="color:${EmailService.C.ink};">${refundWindowHours} hours</strong> before your booking,
+                 from your bookings page. Refunds typically appear in 5–10 business days.
+               </p>`
+            : ''
+        }
         <p style="margin:0;">
           Confirmation usually arrives within a few hours. If you haven't heard back in 24 hours,
           reply to this email and we'll chase it up for you.
@@ -630,6 +729,124 @@ export class EmailService {
         )}
         <p style="margin:0;">Confirm or decline it from your dashboard.</p>`,
       cta: { label: 'Open in dashboard', href: this.adminUrl(`/dashboard/orders/${orderId}`) },
+    });
+  }
+
+  private getBookingCancelledCustomerTemplate(
+    name: string,
+    orderId: number,
+    listingName: string,
+    amount: number,
+    refund: 'full' | 'none' | 'failed',
+  ): string {
+    const C = EmailService.C;
+    const refundLine =
+      refund === 'full'
+        ? `A full refund of ${this.money(amount)} is on its way — it should appear on your original payment method within 5–10 business days.`
+        : refund === 'failed'
+          ? `We tried to refund ${this.money(amount)} automatically and it didn't go through. Reply to this email and we'll sort it out — you won't be left out of pocket.`
+          : `There was nothing to refund on this booking.`;
+
+    return this.shell({
+      title: 'Booking cancelled',
+      preheader: `${listingName} — booking ${this.ref(orderId)} has been cancelled.`,
+      eyebrow: 'Booking cancelled',
+      heading: `Hi ${name}, your booking has been cancelled`,
+      body: `
+        <p style="margin:0 0 4px;">
+          Your booking for <strong style="color:${C.ink};">${listingName}</strong> is cancelled.
+        </p>
+        ${this.detailPanel(
+          [
+            ['Booking reference', this.ref(orderId)],
+            ['Amount', this.money(amount)],
+            ['Refund', refund === 'full' ? 'Being processed' : refund === 'failed' ? 'Needs attention' : 'Not applicable'],
+          ],
+          refund === 'failed' ? C.danger : C.warning,
+        )}
+        <p style="margin:0;">${refundLine}</p>`,
+      cta: { label: 'View your bookings', href: this.siteUrl('/orders') },
+      footNote: `Booking ${this.ref(orderId)}`,
+    });
+  }
+
+  private getBookingCancelledOwnerTemplate(
+    ownerName: string,
+    orderId: number,
+    listingName: string,
+    customerName: string,
+    amount: number,
+  ): string {
+    return this.shell({
+      title: 'Booking cancelled',
+      preheader: `${customerName} cancelled their booking for ${listingName}.`,
+      eyebrow: 'Booking cancelled',
+      heading: `Hi ${ownerName}, a booking was cancelled`,
+      body: `
+        <p style="margin:0 0 4px;">This seat is free again and back in your availability.</p>
+        ${this.detailPanel(
+          [
+            ['Booking reference', this.ref(orderId)],
+            ['Experience', listingName],
+            ['Customer', customerName],
+            ['Amount', this.money(amount)],
+          ],
+          EmailService.C.warning,
+        )}`,
+      cta: { label: 'Open in dashboard', href: this.adminUrl(`/dashboard/orders/${orderId}`) },
+    });
+  }
+
+  private getReviewRequestTemplate(name: string, listingName: string, reviewUrl: string): string {
+    const C = EmailService.C;
+    return this.shell({
+      title: 'How was it?',
+      preheader: `Tell others what ${listingName} was like.`,
+      eyebrow: 'Your visit',
+      heading: `How was ${listingName}?`,
+      body: `
+        <p style="margin:0 0 4px;">
+          Hi ${name} — thanks for booking with us. If you have a minute, a few words help the next
+          person choose well, and they mean a great deal to <strong style="color:${C.ink};">${listingName}</strong>.
+        </p>
+        <p style="margin:14px 0 0;">
+          Only guests who actually booked can review, so yours genuinely counts.
+        </p>`,
+      cta: { label: 'Leave a review', href: reviewUrl },
+      footNote: `You're getting this because you booked through Destination Whisky.`,
+    });
+  }
+
+  private getReviewPublishedTemplate(
+    ownerName: string,
+    listingName: string,
+    rating: number,
+    comment: string,
+    reviewerName: string,
+  ): string {
+    const C = EmailService.C;
+    const stars = '★'.repeat(Math.max(0, Math.min(5, rating))) + '☆'.repeat(Math.max(0, 5 - rating));
+    return this.shell({
+      title: 'New review',
+      preheader: `${reviewerName} left ${rating} stars on ${listingName}.`,
+      eyebrow: 'New review',
+      heading: `${reviewerName} reviewed ${listingName}`,
+      body: `
+        <p style="margin:0 0 18px;font-size:22px;color:${C.gold};letter-spacing:3px;">${stars}</p>
+        ${
+          comment
+            ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;background:${C.cream};border:1px solid ${C.border};border-left:3px solid ${C.gold};border-radius:12px;">
+                 <tr><td style="padding:18px 20px;">
+                   <p style="margin:0;font-family:${EmailService.SERIF};font-size:16px;font-style:italic;color:${C.ink};line-height:1.6;">“${comment}”</p>
+                 </td></tr>
+               </table>`
+            : ''
+        }
+        <p style="margin:0;">
+          A reply from you is public, and it's often what turns a middling review into a reason to
+          book — it shows you're paying attention.
+        </p>`,
+      cta: { label: 'Reply to this review', href: this.adminUrl('/dashboard/reviews') },
     });
   }
 

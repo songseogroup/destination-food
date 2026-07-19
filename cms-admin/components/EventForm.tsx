@@ -16,6 +16,7 @@ interface EventFormProps {
 }
 
 interface EventFormData {
+  refundWindowHours: number | null
   name: string
   type: string
   date: string
@@ -56,6 +57,7 @@ export function EventForm({ event, onSuccess, onCancel }: EventFormProps) {
 
   const { register, handleSubmit, formState: { errors }, setValue, watch, control } = useForm<EventFormData>({
     defaultValues: {
+      refundWindowHours: event?.refundWindowHours ?? 48,
       name: event?.name || '',
       type: event?.type || '',
       date: event?.date || '',
@@ -284,6 +286,24 @@ export function EventForm({ event, onSuccess, onCancel }: EventFormProps) {
               />
               {errors.capacity && <p className="text-red-500 text-sm mt-1">{errors.capacity.message}</p>}
             </div>
+          </div>
+
+          <div>
+            <label className="label">Refund window (hours before booking)</label>
+            <input
+              {...register('refundWindowHours', {
+                setValueAs: (v) => (v === '' || v === null ? null : Number(v)),
+              })}
+              type="number"
+              step="1"
+              min="0"
+              className="input-field"
+              placeholder="48"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Guests can cancel for a full refund up until this many hours before the event, and this
+              is shown to them at checkout. Your own cancellations always refund automatically.
+            </p>
           </div>
 
           <div className="space-y-2">

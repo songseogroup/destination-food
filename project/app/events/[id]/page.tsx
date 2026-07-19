@@ -9,6 +9,10 @@ import Footer from '../../../components/Footer'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import StripePayment from '../../../components/StripePayment'
 import ReviewsSection from '../../../components/ReviewsSection'
+import BadgeChips from '../../../components/BadgeChips'
+import { useEntityBadges } from '../../../lib/useBadges'
+import ClaimListing from '../../../components/ClaimListing'
+import SessionPicker, { BookableSession } from '../../../components/SessionPicker'
 import { EmptyState } from '../../../components/ui/Section'
 import { formatPrice, formatEventDate, formatEventTime } from '../../../lib/format'
 import { apiService, api } from '../../../lib/api'
@@ -20,12 +24,14 @@ export default function EventDetailPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
+  const badges = useEntityBadges('event', id ? Number(id) : undefined)
   const [event, setEvent] = useState<Event | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState(0)
   const [activeTab, setActiveTab] = useState('overview')
   const [isFavorite, setIsFavorite] = useState(false)
   const [ticketQuantity, setTicketQuantity] = useState(1)
+  const [selectedSession, setSelectedSession] = useState<BookableSession | null>(null)
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [bookingForm, setBookingForm] = useState({
     customerName: '',
@@ -140,8 +146,11 @@ export default function EventDetailPage() {
         customerPhone: bookingForm.customerPhone,
         numberOfGuests: ticketQuantity,
         totalAmount: totalPrice,
-        bookingDate: event.date,
-        bookingTime: event.time,
+        // A chosen session carries its own start time; fall back to the event's
+        // own date/time for listings that don't use sessions.
+        sessionId: selectedSession?.id,
+        bookingDate: selectedSession ? selectedSession.startsAt : event.date,
+        bookingTime: selectedSession ? undefined : event.time,
         specialRequests: bookingForm.specialRequests,
         paymentMethod: 'online',
         isPaid: false,
@@ -230,6 +239,8 @@ export default function EventDetailPage() {
               )}
               <span className="font-semibold text-whisky-700">{displayPrice}</span>
             </div>
+
+            {badges.length > 0 && <BadgeChips badges={badges} size="md" className="mt-4" />}
           </div>
         </section>
 
@@ -295,6 +306,10 @@ export default function EventDetailPage() {
                       <h2 className="font-display text-2xl font-bold text-ink mb-4">About This Event</h2>
                       <p className="leading-relaxed text-charcoal-600">{eventDetails.description}</p>
                     </div>
+
+                    {!event.userId && (
+                      <ClaimListing entityType="event" entityId={event.id} listingName={event.name} />
+                    )}
 
                     {eventDetails.highlights.length > 0 && (
                       <div>
@@ -579,6 +594,14 @@ export default function EventDetailPage() {
                     {error}
                   </div>
                 )}
+
+                <SessionPicker
+                  entityType="event"
+                  entityId={event.id}
+                  guests={ticketQuantity}
+                  value={selectedSession}
+                  onChange={setSelectedSession}
+                />
 
                 <div>
                   <label className="label">Full Name *</label>

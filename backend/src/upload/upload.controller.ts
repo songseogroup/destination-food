@@ -9,6 +9,7 @@ import {
   Get 
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { imageUploadOptions } from '../common/upload.options';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 
 import { UploadService } from './upload.service';
@@ -21,7 +22,7 @@ export class UploadController {
 
   @Post('image')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Upload an image file' })
   @ApiConsumes('multipart/form-data')

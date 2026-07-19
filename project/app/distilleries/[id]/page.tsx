@@ -10,6 +10,10 @@ import LoadingSpinner from '../../../components/LoadingSpinner'
 import StripePayment from '../../../components/StripePayment'
 import ReviewsSection from '../../../components/ReviewsSection'
 import StarRating from '../../../components/ui/StarRating'
+import BadgeChips from '../../../components/BadgeChips'
+import { useEntityBadges } from '../../../lib/useBadges'
+import ClaimListing from '../../../components/ClaimListing'
+import SessionPicker, { BookableSession } from '../../../components/SessionPicker'
 import { EmptyState } from '../../../components/ui/Section'
 import { formatPrice } from '../../../lib/format'
 import { apiService } from '../../../lib/api'
@@ -21,6 +25,7 @@ export default function DistilleryDetailPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
+  const badges = useEntityBadges('distillery', id ? Number(id) : undefined)
   const [distillery, setDistillery] = useState<Distillery | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState(0)
@@ -28,6 +33,7 @@ export default function DistilleryDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false)
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [selectedTour, setSelectedTour] = useState<any>(null)
+  const [selectedSession, setSelectedSession] = useState<BookableSession | null>(null)
   const [showPayment, setShowPayment] = useState(false)
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
   const [bookingForm, setBookingForm] = useState({
@@ -137,7 +143,9 @@ export default function DistilleryDetailPage() {
         customerPhone: bookingForm.customerPhone,
         numberOfGuests: bookingForm.numberOfGuests,
         totalAmount: price * bookingForm.numberOfGuests,
-        bookingDate: bookingForm.bookingDate,
+        // A chosen session supplies the time; otherwise the free-text date stands.
+        sessionId: selectedSession?.id,
+        bookingDate: selectedSession ? selectedSession.startsAt : bookingForm.bookingDate,
         specialRequests: bookingForm.specialRequests || `Tour: ${selectedTour.name}`,
         paymentMethod: 'online',
         isPaid: false,
@@ -225,6 +233,8 @@ export default function DistilleryDetailPage() {
                 Est. {distilleryDetails.established}
               </span>
             </div>
+
+            {badges.length > 0 && <BadgeChips badges={badges} size="md" className="mt-4" />}
           </div>
         </section>
 
@@ -293,6 +303,14 @@ export default function DistilleryDetailPage() {
                       <p className="mb-6 leading-relaxed text-charcoal-600">
                         {distilleryDetails.description}
                       </p>
+
+                      {!distillery.userId && (
+                        <ClaimListing
+                          entityType="distillery"
+                          entityId={distillery.id}
+                          listingName={distillery.name}
+                        />
+                      )}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="card p-4">
@@ -616,6 +634,14 @@ export default function DistilleryDetailPage() {
                     {error}
                   </div>
                 )}
+
+                <SessionPicker
+                  entityType="distillery"
+                  entityId={distillery.id}
+                  guests={bookingForm.numberOfGuests}
+                  value={selectedSession}
+                  onChange={setSelectedSession}
+                />
 
                 <div>
                   <label className="label">Full Name *</label>

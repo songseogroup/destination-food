@@ -1,4 +1,4 @@
-import { IsEnum, IsString, IsEmail, IsOptional, IsNumber, IsDateString, IsBoolean, Min } from 'class-validator';
+import { IsEnum, IsString, IsEmail, IsOptional, IsNumber, IsInt, IsDateString, IsBoolean, Min, Max } from 'class-validator';
 import { OrderType } from '../entities/order.entity';
 
 export class CreateOrderDto {
@@ -27,6 +27,10 @@ export class CreateOrderDto {
   @IsOptional()
   eventId?: number;
 
+  @IsOptional()
+  @IsInt()
+  sessionId?: number;
+
   @IsDateString()
   @IsOptional()
   bookingDate?: string;
@@ -37,9 +41,14 @@ export class CreateOrderDto {
 
   @IsNumber()
   @Min(1)
+  @Max(100000)
   numberOfGuests: number;
 
+  // Bounded on both ends: a negative amount would drive customer.totalSpent
+  // backwards, and an absurd one overflows the numeric(10,2) column (a 500).
   @IsNumber()
+  @Min(0)
+  @Max(1000000)
   totalAmount: number;
 
   @IsString()

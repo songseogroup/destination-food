@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { Heart, MapPin } from 'lucide-react'
 import StarRating from './ui/StarRating'
+import BadgeChips from './BadgeChips'
 
 export interface ListingTag {
   label: string
@@ -37,6 +38,8 @@ export interface ListingCardProps {
   /** Bottom-right of the image, e.g. "28% OFF". */
   discount?: string | null
   status?: 'open' | 'closed' | null
+  /** Earned badges (trending, top-rated, etc.). Rendered under the title. */
+  listingBadges?: import('../lib/badges').ListingBadge[]
   showFavorite?: boolean
   className?: string
 }
@@ -65,6 +68,7 @@ export default function ListingCard({
   badge,
   discount,
   status,
+  listingBadges,
   showFavorite = true,
   className = '',
 }: ListingCardProps) {
@@ -148,6 +152,10 @@ export default function ListingCard({
               <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
               <span className="truncate">{metaLine.join(' · ')}</span>
             </p>
+          )}
+
+          {listingBadges && listingBadges.length > 0 && (
+            <BadgeChips badges={listingBadges} />
           )}
 
           {tags.length > 0 && (

@@ -85,4 +85,13 @@ export class CreateDistilleryDto {
   @ValidateNested({ each: true })
   @Type(() => SocialLinkDto)
   socialLinks?: SocialLinkDto[];
+
+  /** Grouped on by the destination landing pages. */
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
 }

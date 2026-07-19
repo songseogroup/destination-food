@@ -1,5 +1,7 @@
 import { Controller, Post, Body, Get, Patch, UseGuards, Request, UseInterceptors, UploadedFiles, UsePipes, ValidationPipe } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { imageUploadOptions } from '../common/upload.options';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 
 import { AuthService } from './auth.service';
@@ -15,6 +17,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Login user' })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
@@ -23,6 +26,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Register new user (Bar, Distillery, Tour Operator, Event Host)' })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @ApiResponse({ status: 409, description: 'User already exists' })
@@ -51,6 +55,7 @@ export class AuthController {
   }
 
   @Post('set-password')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Set password from invite link' })
   @ApiResponse({ status: 200, description: 'Password set successfully' })
   async setPasswordFromInvite(@Body() payload: SetPasswordFromInviteDto) {
@@ -58,6 +63,7 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Request a password reset link (owners + admins)' })
   @ApiResponse({ status: 200, description: 'Reset link sent if the email is registered' })
   async forgotPassword(@Body() payload: ForgotPasswordDto) {
@@ -65,6 +71,7 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Consume a password reset token (owners + admins)' })
   @ApiResponse({ status: 200, description: 'Password updated' })
   async resetPassword(@Body() payload: ResetPasswordDto) {
@@ -72,12 +79,13 @@ export class AuthController {
   }
 
   @Post('register-business')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseInterceptors(FileFieldsInterceptor([
     { name: 'logo', maxCount: 1 },
     { name: 'venueImage0', maxCount: 1 },
     { name: 'venueImage1', maxCount: 1 },
     { name: 'venueImage2', maxCount: 1 },
-  ]))
+  ], imageUploadOptions))
   @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: false }))
   @ApiOperation({ summary: 'Register business with complete details (4-step form)' })
   @ApiConsumes('multipart/form-data')

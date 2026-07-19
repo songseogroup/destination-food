@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Image, Users, List, Settings, Star, ExternalLink } from 'lucide-react'
+import { Image, Users, List, Settings, Star, ExternalLink, CalendarClock } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { isOwnerRole } from '@/lib/roles'
 import { listingUrl } from '@/lib/site'
@@ -30,6 +30,7 @@ export function AdminDetailNav({ id, type, name, isActive = true }: AdminDetailN
     ? [{ label: 'Details', href: `${baseUrl}`, icon: Settings }]
     : [
         { label: 'Details', href: `${baseUrl}`, icon: Settings },
+        { label: 'Sessions', href: `${baseUrl}/sessions`, icon: CalendarClock },
         { label: 'Media', href: `${baseUrl}/media`, icon: Image },
         { label: 'Reviews', href: `${baseUrl}/reviews`, icon: Star },
         { label: 'Customers', href: `${baseUrl}/customers`, icon: Users },

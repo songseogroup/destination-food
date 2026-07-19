@@ -10,6 +10,10 @@ import LoadingSpinner from '../../../components/LoadingSpinner'
 import ReviewsSection from '../../../components/ReviewsSection'
 import StripePayment from '../../../components/StripePayment'
 import StarRating from '../../../components/ui/StarRating'
+import BadgeChips from '../../../components/BadgeChips'
+import ClaimListing from '../../../components/ClaimListing'
+import SessionPicker, { BookableSession } from '../../../components/SessionPicker'
+import { useEntityBadges } from '../../../lib/useBadges'
 import { EmptyState } from '../../../components/ui/Section'
 import { formatPrice } from '../../../lib/format'
 import { apiService } from '../../../lib/api'
@@ -21,6 +25,7 @@ export default function BarDetailPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
+  const badges = useEntityBadges('bar', id ? Number(id) : undefined)
   const [bar, setBar] = useState<Bar | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState(0)
@@ -40,6 +45,7 @@ export default function BarDetailPage() {
   const [error, setError] = useState('')
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
   const [showPayment, setShowPayment] = useState(false)
+  const [selectedSession, setSelectedSession] = useState<BookableSession | null>(null)
 
   useEffect(() => {
     const fetchBar = async () => {
@@ -134,8 +140,10 @@ export default function BarDetailPage() {
         customerPhone: bookingForm.customerPhone,
         numberOfGuests: bookingForm.numberOfGuests,
         totalAmount: depositTotal,
-        bookingDate: bookingForm.bookingDate,
-        bookingTime: bookingForm.bookingTime,
+        // When the bar runs sessions, the chosen slot supplies the time.
+        sessionId: selectedSession?.id,
+        bookingDate: selectedSession ? selectedSession.startsAt : bookingForm.bookingDate,
+        bookingTime: selectedSession ? undefined : bookingForm.bookingTime,
         specialRequests: bookingForm.specialRequests,
         paymentMethod: requiresDeposit ? 'online' : 'on-site',
         isPaid: false,
@@ -220,6 +228,8 @@ export default function BarDetailPage() {
               </span>
               <span className="font-semibold text-whisky-700">{barDetails.priceRange}</span>
             </div>
+
+            {badges.length > 0 && <BadgeChips badges={badges} size="md" className="mt-4" />}
           </div>
         </section>
 
@@ -287,6 +297,10 @@ export default function BarDetailPage() {
                       </h2>
                       <p className="leading-relaxed text-charcoal-600">{barDetails.description}</p>
                     </div>
+
+                    {!bar.userId && (
+                      <ClaimListing entityType="bar" entityId={bar.id} listingName={bar.name} />
+                    )}
 
                     {barDetails.specialties.length > 0 && (
                       <div>
@@ -530,6 +544,13 @@ export default function BarDetailPage() {
               </div>
             ) : (
             <form onSubmit={handleBooking} className="space-y-4">
+              <SessionPicker
+                entityType="bar"
+                entityId={bar.id}
+                guests={bookingForm.numberOfGuests}
+                value={selectedSession}
+                onChange={setSelectedSession}
+              />
               {requiresDeposit && (
                 <div className="flex items-start gap-2 rounded-xl border border-status-warning/30 bg-status-warningSoft p-3">
                   <CreditCard className="mt-0.5 h-4 w-4 flex-shrink-0 text-status-warning" />

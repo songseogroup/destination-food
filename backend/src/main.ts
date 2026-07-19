@@ -4,17 +4,31 @@
 // fell back to the localhost connection and never used DATABASE_URL at all.
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { getConnectionToken } from '@nestjs/typeorm';
-import { json } from 'express';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { seedDatabase } from './database/seed';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true, // Enable raw body for Stripe webhooks
   });
+
+  /**
+   * Trust exactly one proxy hop.
+   *
+   * In production this runs behind Railway's proxy, so without this `req.ip` is
+   * the proxy's address and every visitor looks like the same person — which
+   * would make the review fraud check flag every review ever posted.
+   *
+   * One hop, not `true`: trusting the whole X-Forwarded-For chain lets a caller
+   * prepend any address they like and choose their own identity, which is worse
+   * than not checking at all.
+   */
+  app.set('trust proxy', 1);
 
   // Enable CORS — CORS_ORIGIN is a comma-separated list of allowed origins.
   // Defaults cover local dev so first-time runs don't have to set anything.
@@ -39,12 +53,28 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
-  
 
-  // Global validation pipe
+  // Security headers. CSP is off because this process serves JSON and API docs,
+  // not HTML pages that need a policy — and crossOriginResourcePolicy is opened
+  // up because the frontends (different origins) load uploaded media served from
+  // here; the same-origin default would block every image.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+
+  // Global validation pipe.
+  //  - whitelist: strips any field not on the DTO (blocks mass-assignment)
+  //  - forbidNonWhitelisted: rejects requests that send unknown fields outright
+  //  - transform: coerces payloads to their DTO types
+  //  - forbidUnknownValues: rejects bare/blank bodies rather than treating them
+  //    as an empty valid object
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     forbidNonWhitelisted: true,
+    forbidUnknownValues: true,
     transform: true,
   }));
 

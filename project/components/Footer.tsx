@@ -52,6 +52,17 @@ const EXPLORE = [
 const COMPANY = [
   { href: '/about', label: 'About us' },
   { href: '/feedback', label: 'Send feedback' },
+]
+
+/**
+ * The policies get their own column rather than being buried under "Company".
+ * Refunds in particular is the one people go looking for in a hurry.
+ */
+const LEGAL = [
+  { href: '/terms', label: 'Terms of Service' },
+  { href: '/privacy', label: 'Privacy policy' },
+  { href: '/refund-policy', label: 'Refunds & cancellations' },
+  { href: '/review-guidelines', label: 'Review guidelines' },
   { href: '/cookies', label: 'Cookie policy' },
 ]
 
@@ -93,7 +104,9 @@ export default function Footer() {
   return (
     <footer className="bg-charcoal-900 text-charcoal-300">
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4">
+        {/* 5 columns, not 4: the brand block spans 2, then Explore / Company /
+            Legal take one each. */}
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <Logo className="text-whisky-400" />
             <p className="mt-5 max-w-md leading-relaxed text-charcoal-400">{copy.tagline}</p>
@@ -153,6 +166,19 @@ export default function Footer() {
                 {copy.email}
               </a>
             </div>
+          </div>
+
+          <div>
+            <h4 className="mb-4 font-display text-base font-semibold text-white">Legal</h4>
+            <ul className="space-y-3">
+              {LEGAL.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-charcoal-400 transition-colors hover:text-whisky-400">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 

@@ -5,17 +5,28 @@ import { GlassWater, Search } from 'lucide-react'
 import Header from '../../components/Header'
 import Footer from '../../components/Footer'
 import SitePromoBand from '../../components/SitePromoBand'
+import { useBadges } from '../../lib/useBadges'
 import ListingCard, { ListingCardSkeleton } from '../../components/ListingCard'
 import { EmptyState, ListingGrid } from '../../components/ui/Section'
 import { apiService } from '../../lib/api'
 import { Bar } from '../../lib/types'
 
+/** Rating bands for the filter. 4.5+ is the one the spec calls for. */
+const RATING_OPTIONS = [
+  { value: 'any', label: 'Any rating' },
+  { value: '4.5', label: '4.5+ stars' },
+  { value: '4', label: '4+ stars' },
+  { value: '3', label: '3+ stars' },
+]
+
 export default function BarsPage() {
+  const badgesFor = useBadges()
   const [bars, setBars] = useState<Bar[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState('All Types')
   const [locationFilter, setLocationFilter] = useState('All Locations')
+  const [ratingFilter, setRatingFilter] = useState('any')
 
   useEffect(() => {
     const fetchBars = async () => {
@@ -42,7 +53,13 @@ export default function BarsPage() {
     const matchesType = typeFilter === 'All Types' || bar.type === typeFilter
     const matchesLocation = locationFilter === 'All Locations' || bar.location === locationFilter
 
-    return matchesSearch && matchesType && matchesLocation
+    // An unrated listing (rating null) falls out of every band, which is what
+    // someone asking for "4.5+ stars" means. New venues are only hidden while
+    // this filter is on — the default is "Any rating", which shows them.
+    const matchesRating =
+      ratingFilter === 'any' || Number(bar.rating || 0) >= Number(ratingFilter)
+
+    return matchesSearch && matchesType && matchesLocation && matchesRating
   })
 
   const uniqueTypes = ['All Types', ...Array.from(new Set(bars.map(bar => bar.type)))]
@@ -114,6 +131,21 @@ export default function BarsPage() {
                     <option key={location} value={location}>{location}</option>
                   ))}
                 </select>
+                <label htmlFor="bars-rating" className="sr-only">
+                  Filter by rating
+                </label>
+                <select
+                  id="bars-rating"
+                  value={ratingFilter}
+                  onChange={(e) => setRatingFilter(e.target.value)}
+                  className="input-field sm:w-44"
+                >
+                  {RATING_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -145,6 +177,7 @@ export default function BarsPage() {
                     tags={bar.specialties?.slice(0, 2).map((s) => ({ label: s })) ?? []}
                     status={bar.isOpen ? 'open' : 'closed'}
                     price={bar.priceRange}
+                    listingBadges={badgesFor('bar', bar.id)}
                   />
                 ))}
               </ListingGrid>

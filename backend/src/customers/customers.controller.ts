@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Request,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
@@ -29,12 +30,14 @@ export class CustomersController {
 
   // Public signup endpoint - no authentication required
   @Post('signup')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   signup(@Body() createCustomerDto: CreateCustomerDto) {
     return this.customersService.signup(createCustomerDto);
   }
 
   // Public login endpoint - no authentication required
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   login(@Body() loginDto: LoginCustomerDto) {
     return this.customersService.login(loginDto);
   }

@@ -60,6 +60,12 @@ export class Order {
   @JoinColumn({ name: 'eventId' })
   event: Event;
 
+  // The booked slot, when the listing runs on sessions. Nullable so existing
+  // free-text bookings (bookingDate/bookingTime) and listings without sessions
+  // keep working exactly as before. When set, capacity was enforced against it.
+  @Column({ nullable: true })
+  sessionId: number;
+
   // Booking specifics
   @Column({ type: 'date', nullable: true })
   bookingDate: Date;
@@ -81,6 +87,15 @@ export class Order {
 
   @Column({ default: false })
   autoPayoutProcessed: boolean;
+
+  /**
+   * When the "how was it?" email went out. Null means never.
+   *
+   * The scheduler sweeps past bookings every day, so without a marker every
+   * eligible booking would be asked again every single morning.
+   */
+  @Column({ type: 'timestamp', nullable: true })
+  reviewRequestSentAt: Date;
 
   @Column({ type: 'text', nullable: true })
   specialRequests: string;

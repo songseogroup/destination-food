@@ -11,6 +11,7 @@ import { useCart } from '../../contexts/CartContext'
 import { useCustomerAuth } from '../../contexts/CustomerAuthContext'
 import { apiService } from '../../lib/api'
 import { formatPrice } from '../../lib/format'
+import CancellationPolicy from '../../components/CancellationPolicy'
 
 const SERVICE_FEE = 2.99
 
@@ -310,6 +311,17 @@ export default function CheckoutPage() {
                       <span>{formatPrice(total) ?? 'Free'}</span>
                     </div>
                   </div>
+
+                  {/* Directly above the pay button: the terms have to be readable
+                      at the moment of agreeing to them, not afterwards. */}
+                  <CancellationPolicy
+                    className="mb-6"
+                    items={cartItems.map((item) => ({
+                      type: item.type,
+                      itemId: item.itemId,
+                      title: item.title,
+                    }))}
+                  />
 
                   {/*
                     `error` was already being set by handleSubmit but never rendered,

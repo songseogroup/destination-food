@@ -18,6 +18,8 @@ export interface Bar {
   userId?: number
   createdAt: string
   updatedAt: string
+  /** Hours before the booking that a guest can still self-refund. Default 48. */
+  refundWindowHours?: number
 }
 
 export interface Distillery {
@@ -42,6 +44,8 @@ export interface Distillery {
   userId?: number
   createdAt: string
   updatedAt: string
+  /** Hours before the booking that a guest can still self-refund. Default 48. */
+  refundWindowHours?: number
 }
 
 export interface Event {
@@ -66,6 +70,8 @@ export interface Event {
   userId?: number
   createdAt: string
   updatedAt: string
+  /** Hours before the booking that a guest can still self-refund. Default 48. */
+  refundWindowHours?: number
 }
 
 export interface Blog {
